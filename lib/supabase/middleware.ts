@@ -1,3 +1,4 @@
+import { isAllowedEmail } from "@/lib/allowed-users";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "./types";
@@ -45,6 +46,14 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user) {
+    if (user.email && !isAllowedEmail(user.email)) {
+      await supabase.auth.signOut();
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "not_invited");
+      return NextResponse.redirect(url);
+    }
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("is_active, is_admin")

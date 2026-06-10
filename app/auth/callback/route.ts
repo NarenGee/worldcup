@@ -1,10 +1,11 @@
+import { getDisplayNameForEmail, isAllowedEmail } from "@/lib/allowed-users";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const redirect = searchParams.get("redirect") ?? "/";
+  const redirect = searchParams.get("redirect") ?? "/profile";
 
   if (code) {
     const supabase = await createClient();
@@ -15,6 +16,11 @@ export async function GET(request: Request) {
         data: { user },
       } = await supabase.auth.getUser();
 
+      if (user?.email && !isAllowedEmail(user.email)) {
+        await supabase.auth.signOut();
+        return NextResponse.redirect(`${origin}/login?error=not_invited`);
+      }
+
       if (user) {
         const { data: existingProfile } = await supabase
           .from("profiles")
@@ -24,6 +30,7 @@ export async function GET(request: Request) {
 
         if (!existingProfile) {
           const displayName =
+            getDisplayNameForEmail(user.email ?? "") ??
             (user.user_metadata?.display_name as string | undefined) ??
             (user.user_metadata?.full_name as string | undefined);
 
