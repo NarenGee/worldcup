@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   const destination =
     typeof redirect === "string" && redirect.startsWith("/")
       ? redirect
-      : "/profile";
+      : "/";
 
   const admin = createServiceClient();
   const supabase = await createClient();

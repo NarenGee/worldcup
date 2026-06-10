@@ -15,7 +15,7 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
-  const redirect = searchParams.get("redirect") ?? "/profile";
+  const redirect = searchParams.get("redirect") ?? "/";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,7 +36,7 @@ export function LoginForm() {
     }
 
     toast.success("Signed in!");
-    router.push(json.redirect ?? "/profile");
+    router.push(json.redirect ?? "/");
     router.refresh();
   }
 

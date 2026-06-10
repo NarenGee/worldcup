@@ -20,11 +20,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative min-h-screen">
-      <NavBar profile={profile} />
+      <NavBar profile={profile} signedIn={!!user} />
       <main className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:px-6 sm:py-8 lg:border-x lg:border-border lg:pb-8">
         {children}
       </main>
-      <MobileNav />
+      <MobileNav signedIn={!!user} />
     </div>
   );
 }

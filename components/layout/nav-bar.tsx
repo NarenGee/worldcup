@@ -1,8 +1,10 @@
 "use client";
 
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +27,7 @@ const links = [
 
 type NavBarProps = {
   profile: Profile | null;
+  signedIn: boolean;
 };
 
 function sessionDate() {
@@ -32,8 +35,9 @@ function sessionDate() {
   return `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, "0")}.${String(now.getDate()).padStart(2, "0")}`;
 }
 
-export function NavBar({ profile }: NavBarProps) {
+export function NavBar({ profile, signedIn }: NavBarProps) {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-sm">
@@ -85,9 +89,12 @@ export function NavBar({ profile }: NavBarProps) {
                 Admin
               </Link>
             )}
+            {signedIn && (
+              <LogoutButton className="ml-1" />
+            )}
           </nav>
 
-          {profile ? (
+          {signedIn && profile ? (
             <Link href="/profile" className="hidden shrink-0 lg:block">
               <Avatar className="size-8 border-2 border-primary">
                 <AvatarImage
@@ -102,15 +109,14 @@ export function NavBar({ profile }: NavBarProps) {
               </Avatar>
             </Link>
           ) : (
-            <Link
-              href="/login"
-              className="instrument-meta hidden border border-primary bg-primary px-2.5 py-1.5 text-primary-foreground lg:inline-block"
-            >
-              Login
+            <Link href="/login" className="shrink-0">
+              <Button size="lg" className="px-4 shadow-sm">
+                Sign in
+              </Button>
             </Link>
           )}
 
-          <Dialog>
+          <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
             <DialogTrigger
               render={
                 <Button
@@ -131,18 +137,27 @@ export function NavBar({ profile }: NavBarProps) {
               </DialogHeader>
               <nav className="flex flex-col gap-0">
                 {links.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={cn(
-                      "instrument-divider instrument-meta py-3 transition-colors",
-                      pathname === link.href
-                        ? "text-primary"
-                        : "text-muted-foreground hover:text-foreground"
+                  <Fragment key={link.href}>
+                    <Link
+                      href={link.href}
+                      className={cn(
+                        "instrument-divider instrument-meta py-3 transition-colors",
+                        pathname === link.href
+                          ? "text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {link.label}
+                    </Link>
+                    {link.href === "/profile" && signedIn && (
+                      <div className="instrument-divider pb-3">
+                        <LogoutButton
+                          fullWidth
+                          onLoggedOut={() => setMenuOpen(false)}
+                        />
+                      </div>
                     )}
-                  >
-                    {link.label}
-                  </Link>
+                  </Fragment>
                 ))}
                 {profile?.is_admin && (
                   <Link
@@ -157,12 +172,9 @@ export function NavBar({ profile }: NavBarProps) {
                     Admin
                   </Link>
                 )}
-                {!profile && (
-                  <Link
-                    href="/login"
-                    className="instrument-divider instrument-meta py-3 text-primary"
-                  >
-                    Login
+                {!signedIn && (
+                  <Link href="/login" className="instrument-divider pt-4">
+                    <Button className="w-full">Sign in</Button>
                   </Link>
                 )}
               </nav>

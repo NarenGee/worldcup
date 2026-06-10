@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AvatarUpload } from "@/components/profile/avatar-upload";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -90,6 +91,8 @@ export function ProfileForm({ profile: initialProfile }: ProfileFormProps) {
           </form>
         </CardContent>
       </Card>
+
+      <LogoutButton fullWidth />
     </div>
   );
 }
