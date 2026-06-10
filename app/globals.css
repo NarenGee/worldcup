@@ -2,26 +2,157 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 40 15% 90%;
+    --foreground: 0 0% 8%;
+    --card: 40 20% 94%;
+    --card-foreground: 0 0% 8%;
+    --popover: 40 20% 94%;
+    --popover-foreground: 0 0% 8%;
+    --primary: 152 56% 32%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 207 75% 92%;
+    --secondary-foreground: 207 60% 28%;
+    --muted: 40 12% 86%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 0 72% 50%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --wc-gold: 43 96% 52%;
+    --wc-blue: 207 75% 48%;
+    --border: 40 10% 78%;
+    --input: 40 15% 88%;
+    --ring: 152 56% 32%;
+    --radius: 0px;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
+@layer components {
+  .instrument-bg,
+  .instrument-bg-overlay {
+    background-color: hsl(var(--background));
+    background-image:
+      radial-gradient(
+        circle at 20% 10%,
+        hsl(var(--primary) / 0.06) 0%,
+        transparent 45%
+      ),
+      radial-gradient(
+        circle at 80% 90%,
+        hsl(var(--accent) / 0.05) 0%,
+        transparent 45%
+      ),
+      radial-gradient(
+        circle,
+        hsl(var(--wc-blue) / 0.12) 1px,
+        transparent 1px
+      );
+    background-size: auto, auto, 14px 14px;
+  }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  .instrument-bg-overlay {
+    background-color: hsl(var(--background) / 0.62);
+    background-image:
+      radial-gradient(
+        circle at 20% 10%,
+        hsl(var(--primary) / 0.04) 0%,
+        transparent 45%
+      ),
+      radial-gradient(
+        circle at 80% 90%,
+        hsl(var(--accent) / 0.03) 0%,
+        transparent 45%
+      ),
+      radial-gradient(
+        circle,
+        hsl(var(--wc-blue) / 0.08) 1px,
+        transparent 1px
+      );
+  }
+
+  @keyframes haircut-ken-burns {
+    from {
+      transform: scale(1);
+    }
+    to {
+      transform: scale(1.08);
+    }
+  }
+
+  .haircut-slide-image {
+    animation: haircut-ken-burns 14s ease-out forwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .haircut-slide-image {
+      animation: none;
+    }
+  }
+
+  .instrument-panel {
+    @apply border border-border bg-card/90 shadow-sm;
+    border-left: 3px solid hsl(var(--primary));
+  }
+
+  .instrument-label {
+    @apply font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-primary;
+  }
+
+  .instrument-title {
+    @apply font-display text-lg font-black uppercase tracking-[0.1em] text-foreground sm:text-2xl md:text-3xl;
+  }
+
+  .instrument-heading {
+    @apply font-display text-base font-black uppercase tracking-[0.08em] sm:text-lg;
+  }
+
+  .instrument-meta {
+    @apply font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground;
+  }
+
+  .instrument-score {
+    @apply font-display text-4xl font-black tabular-nums leading-none tracking-tight sm:text-5xl md:text-6xl;
+  }
+
+  .instrument-divider {
+    @apply border-b border-border;
+  }
+
+  .instrument-status-bar {
+    @apply bg-primary px-3 py-2 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-primary-foreground sm:px-4 sm:text-[11px];
+  }
+
+  .instrument-status-bar-accent {
+    @apply bg-accent px-3 py-2 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-accent-foreground sm:px-4 sm:text-[11px];
+  }
+
+  .instrument-rank-gold {
+    color: hsl(var(--wc-gold));
+  }
+
+  .instrument-rank-silver {
+    @apply text-muted-foreground;
+  }
+
+  .instrument-rank-bronze {
+    color: hsl(25 70% 45%);
+  }
+
+  .instrument-quote {
+    @apply border-l-2 border-accent/35 pl-3 text-left text-xs font-normal normal-case italic leading-relaxed tracking-normal text-muted-foreground;
+  }
+
+  .instrument-quote-compact {
+    @apply line-clamp-3 text-[11px] leading-snug sm:line-clamp-none;
   }
 }
