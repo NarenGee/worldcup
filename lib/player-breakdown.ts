@@ -125,7 +125,12 @@ export async function getPlayerPointsBreakdown(
     champion && actualChampion && champion === actualChampion ? 5 : 0;
   const topScorerPoints =
     topScorer && actualTopScorer && topScorer === actualTopScorer ? 3 : 0;
-  const propsPoints = championPoints + topScorerPoints;
+  const propsPoints = calculatePropsPoints(
+    champion,
+    topScorer,
+    actualChampion,
+    actualTopScorer
+  );
   const matchPoints = matches.reduce((sum, line) => sum + line.points, 0);
 
   return {
