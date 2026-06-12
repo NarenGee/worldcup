@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { applyDefaultPredictions } from "@/lib/apply-default-predictions";
+import { scorePredictions } from "@/lib/score-predictions";
 import type { Database } from "@/lib/supabase/types";
 
 const STAGE_MAP: Record<string, string> = {
@@ -88,11 +89,19 @@ export async function syncResultsFromApi(
     }
   }
 
+  let predictionsScored = 0;
+
   try {
     await applyDefaultPredictions(supabase);
   } catch {
     // Migration may not be applied yet.
   }
 
-  return { total: apiMatches.length, upserted, skipped };
+  try {
+    predictionsScored = await scorePredictions(supabase);
+  } catch {
+    // Migration may not be applied yet.
+  }
+
+  return { total: apiMatches.length, upserted, skipped, predictionsScored };
 }

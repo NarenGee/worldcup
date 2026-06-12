@@ -74,8 +74,12 @@ export function AdminPanel({
       return;
     }
 
+    const scored =
+      typeof json.predictionsScored === "number"
+        ? ` · ${json.predictionsScored} predictions scored`
+        : "";
     toast.success(
-      `Synced ${json.upserted} of ${json.total} matches (${json.skipped} skipped)`
+      `Synced ${json.upserted} of ${json.total} matches (${json.skipped} skipped)${scored}`
     );
     const { data } = await supabase
       .from("matches")
@@ -105,6 +109,12 @@ export function AdminPanel({
     }
 
     setMatches((prev) => prev.map((m) => (m.id === id ? data : m)));
+
+    const { error: scoreError } = await supabase.rpc("score_predictions");
+    if (scoreError) {
+      console.warn("score_predictions:", scoreError.message);
+    }
+
     toast.success("Match updated");
   }
 

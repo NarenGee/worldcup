@@ -116,12 +116,23 @@ Deno.serve(async (req) => {
       console.warn("apply_default_predictions:", defaultError.message);
     }
 
+    let predictionsScored = 0;
+    const { data: scored, error: scoreError } = await supabase.rpc(
+      "score_predictions"
+    );
+    if (scoreError) {
+      console.warn("score_predictions:", scoreError.message);
+    } else {
+      predictionsScored = scored ?? 0;
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         total: apiMatches.length,
         upserted,
         skipped,
+        predictionsScored,
       }),
       { headers: { "Content-Type": "application/json" } }
     );

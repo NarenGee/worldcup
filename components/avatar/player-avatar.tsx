@@ -15,6 +15,8 @@ type PlayerAvatarProps = {
   avatarUrl?: string | null;
   className?: string;
   fallbackClassName?: string;
+  /** When false, renders a static avatar (no zoom dialog). Use inside other buttons. */
+  interactive?: boolean;
 };
 
 export function PlayerAvatar({
@@ -22,18 +24,22 @@ export function PlayerAvatar({
   avatarUrl,
   className,
   fallbackClassName,
+  interactive = true,
 }: PlayerAvatarProps) {
   const [open, setOpen] = useState(false);
   const src = resolveAvatarUrl(displayName, avatarUrl);
 
-  if (!src) {
-    return (
-      <Avatar className={className}>
-        <AvatarFallback className={fallbackClassName}>
-          {displayName.slice(0, 2).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
-    );
+  const avatar = (
+    <Avatar className={className}>
+      {src ? <AvatarImage src={src} /> : null}
+      <AvatarFallback className={fallbackClassName}>
+        {displayName.slice(0, 2).toUpperCase()}
+      </AvatarFallback>
+    </Avatar>
+  );
+
+  if (!src || !interactive) {
+    return avatar;
   }
 
   return (

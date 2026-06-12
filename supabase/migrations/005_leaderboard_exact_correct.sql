@@ -1,4 +1,4 @@
--- Add exact-score rate to leaderboard (exact score = 3 match points)
+-- Correct % counts exact scores only (3 pts), not outcome-only picks (1 pt)
 
 create or replace view leaderboard as
 select
@@ -6,12 +6,15 @@ select
   p.display_name,
   p.avatar_url,
   coalesce(sum(
-    calculate_match_points(
-      coalesce(pr.predicted_home, 1),
-      coalesce(pr.predicted_away, 1),
-      m.home_score,
-      m.away_score,
-      m.result_confirmed
+    coalesce(
+      pr.points,
+      calculate_match_points(
+        coalesce(pr.predicted_home, 1),
+        coalesce(pr.predicted_away, 1),
+        m.home_score,
+        m.away_score,
+        m.result_confirmed
+      )
     )
   ) filter (where m.kickoff_at <= now()), 0)
   + case when prop.champion is not null and prop.champion = tr.champion then 5 else 0 end
@@ -22,12 +25,15 @@ select
   count(*) filter (
     where m.result_confirmed
       and m.kickoff_at <= now()
-      and calculate_match_points(
-        coalesce(pr.predicted_home, 1),
-        coalesce(pr.predicted_away, 1),
-        m.home_score,
-        m.away_score,
-        m.result_confirmed
+      and coalesce(
+        pr.points,
+        calculate_match_points(
+          coalesce(pr.predicted_home, 1),
+          coalesce(pr.predicted_away, 1),
+          m.home_score,
+          m.away_score,
+          m.result_confirmed
+        )
       ) = 3
   ) as correct_predictions,
   case
@@ -36,12 +42,15 @@ select
       100.0 * count(*) filter (
         where m.result_confirmed
           and m.kickoff_at <= now()
-          and calculate_match_points(
-            coalesce(pr.predicted_home, 1),
-            coalesce(pr.predicted_away, 1),
-            m.home_score,
-            m.away_score,
-            m.result_confirmed
+          and coalesce(
+            pr.points,
+            calculate_match_points(
+              coalesce(pr.predicted_home, 1),
+              coalesce(pr.predicted_away, 1),
+              m.home_score,
+              m.away_score,
+              m.result_confirmed
+            )
           ) = 3
       ) / count(*) filter (where m.result_confirmed and m.kickoff_at <= now()),
       1

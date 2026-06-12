@@ -74,10 +74,9 @@ export function RulesSection() {
 
       <div className="instrument-divider border-t px-3 py-3 sm:px-4">
         <p className="text-sm text-muted-foreground">
-          Total points = match points + prop points. Correct % is the share of
-          finished matches where you picked the right outcome (win, draw, or
-          loss). The leaderboard updates in real time. Sign in to submit your
-          picks.
+          Total points = match points + prop points. Tap a player on the
+          leaderboard to see their full points breakdown. The leaderboard
+          updates in real time. Sign in to submit your picks.
         </p>
       </div>
     </section>

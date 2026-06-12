@@ -33,6 +33,7 @@ export type Prediction = {
   match_id: number;
   predicted_home: number;
   predicted_away: number;
+  points: number | null;
   submitted_at: string;
 };
 
@@ -121,6 +122,7 @@ export type Database = {
         Update: {
           predicted_home?: number;
           predicted_away?: number;
+          points?: number | null;
         };
         Relationships: [];
       };
@@ -165,6 +167,10 @@ export type Database = {
       apply_default_predictions: {
         Args: Record<string, never>;
         Returns: undefined;
+      };
+      score_predictions: {
+        Args: Record<string, never>;
+        Returns: number;
       };
       calculate_match_points: {
         Args: {
