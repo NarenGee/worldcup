@@ -1,6 +1,8 @@
 import { getLeaderboardEntries } from "@/lib/leaderboard-entries";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const supabase = await createClient();
   try {

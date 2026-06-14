@@ -6,6 +6,7 @@ import { PlayerBreakdownDialog } from "@/components/leaderboard/player-breakdown
 import { createClient } from "@/lib/supabase/client";
 import type { LeaderboardEntry } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
+import { formatAwardedPoints } from "@/lib/scoring";
 
 function formatRank(rank: number): string {
   return String(rank).padStart(2, "0");
@@ -30,11 +31,14 @@ export function LeaderboardTable({ initialEntries }: LeaderboardTableProps) {
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
-      const res = await fetch("/api/leaderboard");
+      const res = await fetch("/api/leaderboard", { cache: "no-store" });
       if (!res.ok) return;
       const data = (await res.json()) as LeaderboardEntry[];
       if (Array.isArray(data)) setEntries(data);
     };
+
+    fetchLeaderboard();
+    const pollInterval = window.setInterval(fetchLeaderboard, 60_000);
 
     const channel = supabase
       .channel("leaderboard-updates")
@@ -66,6 +70,7 @@ export function LeaderboardTable({ initialEntries }: LeaderboardTableProps) {
       .subscribe();
 
     return () => {
+      window.clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [supabase]);
@@ -138,7 +143,7 @@ export function LeaderboardTable({ initialEntries }: LeaderboardTableProps) {
                     rank <= 3 ? "text-primary" : "text-foreground"
                   )}
                 >
-                  {entry.score}
+                  {formatAwardedPoints(entry.score)}
                 </p>
                 <p className="instrument-meta">PTS</p>
               </div>

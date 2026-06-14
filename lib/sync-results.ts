@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { applyDefaultPredictions } from "@/lib/apply-default-predictions";
+import { isResultConfirmed, upsertMatchFromApi } from "@/lib/match-sync";
 import { scorePredictions } from "@/lib/score-predictions";
 import type { Database } from "@/lib/supabase/types";
 
@@ -56,17 +57,11 @@ export async function syncResultsFromApi(
     }
 
     const externalId = String(match.id);
-    const isFinished = match.status === "FINISHED";
+    const isFinished = isResultConfirmed(match.status);
     const homeScore = match.score?.fullTime?.home ?? null;
     const awayScore = match.score?.fullTime?.away ?? null;
 
-    const { data: existing } = await supabase
-      .from("matches")
-      .select("id")
-      .eq("external_id", externalId)
-      .maybeSingle();
-
-    const payload = {
+    const result = await upsertMatchFromApi(supabase, {
       stage: stage as Database["public"]["Tables"]["matches"]["Insert"]["stage"],
       home_team: match.homeTeam.name,
       away_team: match.awayTeam.name,
@@ -75,18 +70,10 @@ export async function syncResultsFromApi(
       away_score: isFinished ? awayScore : null,
       result_confirmed: isFinished,
       external_id: externalId,
-    };
+    });
 
-    if (existing) {
-      const { error } = await supabase
-        .from("matches")
-        .update(payload)
-        .eq("id", existing.id);
-      if (!error) upserted++;
-    } else {
-      const { error } = await supabase.from("matches").insert(payload);
-      if (!error) upserted++;
-    }
+    if (result === "upserted") upserted++;
+    else skipped++;
   }
 
   let predictionsScored = 0;

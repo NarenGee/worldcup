@@ -7,7 +7,7 @@ import {
   type MatchPlayerPick,
 } from "@/lib/match-predictions";
 import { isMatchLocked } from "@/lib/predictions";
-import { calculateMatchPoints } from "@/lib/scoring";
+import { awardMatchPoints, formatAwardedPoints } from "@/lib/scoring";
 import type { Match } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 
@@ -65,12 +65,13 @@ export function MatchPredictionsList({
             match?.result_confirmed &&
             match.home_score !== null &&
             match.away_score !== null
-              ? calculateMatchPoints(
+              ? awardMatchPoints(
                   pick.predictedHome,
                   pick.predictedAway,
                   match.home_score,
                   match.away_score,
-                  match.result_confirmed
+                  match.result_confirmed,
+                  pick.isDefault
                 )
               : null;
 
@@ -116,7 +117,7 @@ export function MatchPredictionsList({
                     )}
                     {points !== null && (
                       <span className="instrument-meta text-accent">
-                        +{points}
+                        +{formatAwardedPoints(points)}
                       </span>
                     )}
                   </>

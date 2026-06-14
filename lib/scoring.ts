@@ -23,6 +23,47 @@ export function calculateMatchPoints(
   return 0;
 }
 
+export function awardMatchPoints(
+  predictedHome: number,
+  predictedAway: number,
+  homeScore: number | null,
+  awayScore: number | null,
+  resultConfirmed: boolean,
+  isDefault: boolean
+): number {
+  const base = calculateMatchPoints(
+    predictedHome,
+    predictedAway,
+    homeScore,
+    awayScore,
+    resultConfirmed
+  );
+  return isDefault ? base / 2 : base;
+}
+
+export function formatAwardedPoints(points: number): string {
+  return Number.isInteger(points) ? String(points) : points.toFixed(1);
+}
+
+export function baseResultLabel(
+  predictedHome: number,
+  predictedAway: number,
+  homeScore: number | null,
+  awayScore: number | null,
+  resultConfirmed: boolean
+): "exact" | "outcome" | "miss" {
+  const base = calculateMatchPoints(
+    predictedHome,
+    predictedAway,
+    homeScore,
+    awayScore,
+    resultConfirmed
+  );
+  if (base === 3) return "exact";
+  if (base === 1) return "outcome";
+  return "miss";
+}
+
 export function calculatePropsPoints(
   champion: string | null,
   topScorer: string | null,

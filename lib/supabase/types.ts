@@ -34,6 +34,7 @@ export type Prediction = {
   predicted_home: number;
   predicted_away: number;
   points: number | null;
+  is_default: boolean;
   submitted_at: string;
 };
 
@@ -117,12 +118,14 @@ export type Database = {
           match_id: number;
           predicted_home: number;
           predicted_away: number;
+          is_default?: boolean;
           submitted_at?: string;
         };
         Update: {
           predicted_home?: number;
           predicted_away?: number;
           points?: number | null;
+          is_default?: boolean;
         };
         Relationships: [];
       };

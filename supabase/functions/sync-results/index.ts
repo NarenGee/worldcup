@@ -21,6 +21,100 @@ type ApiMatch = {
   };
 };
 
+const FINISHED_STATUSES = new Set(["FINISHED", "AWARDED"]);
+
+function isResultConfirmed(status: string): boolean {
+  return FINISHED_STATUSES.has(status);
+}
+
+async function findMatchByFixture(
+  supabase: ReturnType<typeof createClient>,
+  homeTeam: string,
+  awayTeam: string,
+  kickoffAt: string
+) {
+  const { data } = await supabase
+    .from("matches")
+    .select("id, external_id, home_team, away_team, kickoff_at")
+    .eq("home_team", homeTeam)
+    .eq("away_team", awayTeam)
+    .eq("kickoff_at", kickoffAt)
+    .order("id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  return data;
+}
+
+async function findMatchByExternalId(
+  supabase: ReturnType<typeof createClient>,
+  externalId: string
+) {
+  const { data } = await supabase
+    .from("matches")
+    .select("id, external_id, home_team, away_team, kickoff_at")
+    .eq("external_id", externalId)
+    .maybeSingle();
+
+  return data;
+}
+
+async function upsertMatchFromApi(
+  supabase: ReturnType<typeof createClient>,
+  payload: {
+    stage: string;
+    home_team: string;
+    away_team: string;
+    kickoff_at: string;
+    home_score: number | null;
+    away_score: number | null;
+    result_confirmed: boolean;
+    external_id: string;
+  }
+): Promise<"upserted" | "skipped"> {
+  const [byExternalId, byFixture] = await Promise.all([
+    findMatchByExternalId(supabase, payload.external_id),
+    findMatchByFixture(
+      supabase,
+      payload.home_team,
+      payload.away_team,
+      payload.kickoff_at
+    ),
+  ]);
+
+  if (byFixture && byExternalId && byFixture.id !== byExternalId.id) {
+    const { error: deleteError } = await supabase
+      .from("matches")
+      .delete()
+      .eq("id", byExternalId.id);
+
+    if (deleteError) {
+      return "skipped";
+    }
+
+    const { error } = await supabase
+      .from("matches")
+      .update(payload)
+      .eq("id", byFixture.id);
+
+    return error ? "skipped" : "upserted";
+  }
+
+  const target = byExternalId ?? byFixture;
+
+  if (target) {
+    const { error } = await supabase
+      .from("matches")
+      .update(payload)
+      .eq("id", target.id);
+
+    return error ? "skipped" : "upserted";
+  }
+
+  const { error } = await supabase.from("matches").insert(payload);
+  return error ? "skipped" : "upserted";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -76,17 +170,11 @@ Deno.serve(async (req) => {
       }
 
       const externalId = String(match.id);
-      const isFinished = match.status === "FINISHED";
+      const isFinished = isResultConfirmed(match.status);
       const homeScore = match.score?.fullTime?.home ?? null;
       const awayScore = match.score?.fullTime?.away ?? null;
 
-      const { data: existing } = await supabase
-        .from("matches")
-        .select("id")
-        .eq("external_id", externalId)
-        .maybeSingle();
-
-      const payload = {
+      const result = await upsertMatchFromApi(supabase, {
         stage,
         home_team: match.homeTeam.name,
         away_team: match.awayTeam.name,
@@ -95,18 +183,10 @@ Deno.serve(async (req) => {
         away_score: isFinished ? awayScore : null,
         result_confirmed: isFinished,
         external_id: externalId,
-      };
+      });
 
-      if (existing) {
-        const { error } = await supabase
-          .from("matches")
-          .update(payload)
-          .eq("id", existing.id);
-        if (!error) upserted++;
-      } else {
-        const { error } = await supabase.from("matches").insert(payload);
-        if (!error) upserted++;
-      }
+      if (result === "upserted") upserted++;
+      else skipped++;
     }
 
     const { error: defaultError } = await supabase.rpc(

@@ -2,6 +2,7 @@ const MATCH_RULES = [
   { label: "Exact score", points: 3 },
   { label: "Correct outcome", points: 1, detail: "win, draw, or loss" },
   { label: "Wrong outcome", points: 0 },
+  { label: "Auto pick (missed)", points: "½", detail: "half of match points" },
 ] as const;
 
 const PROP_RULES = [
@@ -22,7 +23,7 @@ export function RulesSection() {
             <h2 className="instrument-heading text-sm">Match predictions</h2>
             <p className="instrument-meta mt-1.5">
               Pick a score for every match on the Predict page before kickoff.
-              Missed picks default to 1–1 and lock at kickoff. Other players&apos;
+              Missed picks default to 1–1 and earn half points. Other players&apos;
               picks stay hidden until kickoff — yours are always visible to you.
             </p>
           </div>
@@ -41,7 +42,7 @@ export function RulesSection() {
                   )}
                 </span>
                 <span className="shrink-0 font-display text-sm font-black tabular-nums text-primary">
-                  +{rule.points}
+                  {typeof rule.points === "number" ? `+${rule.points}` : rule.points}
                 </span>
               </li>
             ))}

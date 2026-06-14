@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { calculateMatchPoints, calculatePropsPoints } from "@/lib/scoring";
+import { awardMatchPoints, baseResultLabel, calculatePropsPoints } from "@/lib/scoring";
 import type { Database } from "@/lib/supabase/types";
 
 export type MatchBreakdownLine = {
@@ -13,6 +13,7 @@ export type MatchBreakdownLine = {
   actual_home: number;
   actual_away: number;
   points: number;
+  is_default: boolean;
   result_label: "exact" | "outcome" | "miss";
 };
 
@@ -36,10 +37,19 @@ export type PlayerPointsBreakdown = {
   props: PropsBreakdown;
 };
 
-function resultLabel(points: number): MatchBreakdownLine["result_label"] {
-  if (points === 3) return "exact";
-  if (points === 1) return "outcome";
-  return "miss";
+function resultLabel(
+  predictedHome: number,
+  predictedAway: number,
+  actualHome: number,
+  actualAway: number
+): MatchBreakdownLine["result_label"] {
+  return baseResultLabel(
+    predictedHome,
+    predictedAway,
+    actualHome,
+    actualAway,
+    true
+  );
 }
 
 export async function getPlayerPointsBreakdown(
@@ -65,7 +75,7 @@ export async function getPlayerPointsBreakdown(
   ] = await Promise.all([
     supabase
       .from("predictions")
-      .select("match_id, predicted_home, predicted_away, points")
+      .select("match_id, predicted_home, predicted_away, points, is_default")
       .eq("user_id", userId),
     supabase
       .from("matches")
@@ -87,14 +97,16 @@ export async function getPlayerPointsBreakdown(
       continue;
     }
 
+    const isDefault = prediction.is_default ?? false;
     const points =
       prediction.points ??
-      calculateMatchPoints(
+      awardMatchPoints(
         prediction.predicted_home,
         prediction.predicted_away,
         match.home_score,
         match.away_score,
-        match.result_confirmed
+        match.result_confirmed,
+        isDefault
       );
 
     matches.push({
@@ -108,7 +120,13 @@ export async function getPlayerPointsBreakdown(
       actual_home: match.home_score,
       actual_away: match.away_score,
       points,
-      result_label: resultLabel(points),
+      is_default: isDefault,
+      result_label: resultLabel(
+        prediction.predicted_home,
+        prediction.predicted_away,
+        match.home_score,
+        match.away_score
+      ),
     });
   }
 

@@ -31,7 +31,7 @@ export default async function PredictPage() {
         .order("display_name"),
       supabase
         .from("predictions")
-        .select("user_id, match_id, predicted_home, predicted_away"),
+        .select("user_id, match_id, predicted_home, predicted_away, is_default"),
     ]);
 
   const groupMatches = (matches ?? []).filter((m) => m.stage === "group");

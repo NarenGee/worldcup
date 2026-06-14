@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { PlayerPointsBreakdown } from "@/lib/player-breakdown";
+import { formatAwardedPoints } from "@/lib/scoring";
 import { STAGE_LABELS } from "@/lib/teams";
 import type { LeaderboardEntry } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
@@ -25,31 +26,42 @@ function formatScore(home: number, away: number) {
   return `${home}–${away}`;
 }
 
-function pointsLabel(points: number, resultLabel?: "exact" | "outcome" | "miss") {
-  if (points === 3 || resultLabel === "exact") return "Exact";
-  if (points === 1 || resultLabel === "outcome") return "Outcome";
+function pointsLabel(
+  points: number,
+  resultLabel?: "exact" | "outcome" | "miss",
+  isDefault?: boolean
+) {
+  if (resultLabel === "exact") return isDefault ? "Exact · half" : "Exact";
+  if (resultLabel === "outcome") return isDefault ? "Outcome · half" : "Outcome";
+  if (points === 3) return "Exact";
+  if (points === 1) return "Outcome";
   return "Miss";
 }
 
 function PointsBadge({
   points,
   resultLabel,
+  isDefault,
 }: {
   points: number;
   resultLabel?: "exact" | "outcome" | "miss";
+  isDefault?: boolean;
 }) {
+  const isExact = resultLabel === "exact";
+  const isOutcome = resultLabel === "outcome";
+
   return (
     <span
       className={cn(
         "shrink-0 font-display text-sm font-black tabular-nums",
-        points === 3 && "text-primary",
-        points === 1 && "text-foreground",
-        points === 0 && "text-muted-foreground"
+        isExact && "text-primary",
+        isOutcome && "text-foreground",
+        !isExact && !isOutcome && "text-muted-foreground"
       )}
     >
-      {points > 0 ? `+${points}` : "0"}
+      {points > 0 ? `+${formatAwardedPoints(points)}` : "0"}
       <span className="instrument-meta ml-1.5 font-sans font-normal normal-case">
-        {pointsLabel(points, resultLabel)}
+        {pointsLabel(points, resultLabel, isDefault)}
       </span>
     </span>
   );
@@ -207,6 +219,9 @@ export function PlayerBreakdownDialog({
                           </p>
                           <p className="instrument-meta mt-1.5">
                             Pick {formatScore(match.predicted_home, match.predicted_away)}
+                            {match.is_default && (
+                              <span className="ml-1.5 normal-case">(default)</span>
+                            )}
                             <span className="mx-1.5">·</span>
                             Actual {formatScore(match.actual_home, match.actual_away)}
                           </p>
@@ -214,6 +229,7 @@ export function PlayerBreakdownDialog({
                         <PointsBadge
                           points={match.points}
                           resultLabel={match.result_label}
+                          isDefault={match.is_default}
                         />
                       </div>
                     </li>

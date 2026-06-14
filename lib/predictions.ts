@@ -8,7 +8,10 @@ export function isMatchLocked(kickoffAt: string, now = new Date()): boolean {
 
 export function getEffectivePrediction(
   kickoffAt: string,
-  prediction?: Pick<Prediction, "predicted_home" | "predicted_away"> | null,
+  prediction?: Pick<
+    Prediction,
+    "predicted_home" | "predicted_away" | "is_default"
+  > | null,
   now = new Date()
 ): {
   predicted_home: number;
@@ -19,7 +22,7 @@ export function getEffectivePrediction(
     return {
       predicted_home: prediction.predicted_home,
       predicted_away: prediction.predicted_away,
-      isDefault: false,
+      isDefault: prediction.is_default ?? false,
     };
   }
 

@@ -27,7 +27,7 @@ export function buildMatchPlayerPicks(
   players: PlayerProfile[],
   predictionsForMatch: Record<
     string,
-    Pick<Prediction, "predicted_home" | "predicted_away"> | undefined
+    Pick<Prediction, "predicted_home" | "predicted_away" | "is_default"> | undefined
   >,
   currentUserId?: string
 ): MatchPlayerPick[] {
@@ -43,7 +43,7 @@ export function buildMatchPlayerPicks(
         predictedHome: effective.predicted_home,
         predictedAway: effective.predicted_away,
         isDefault: effective.isDefault,
-        hasSubmitted: !!stored,
+        hasSubmitted: !!stored && !(stored.is_default ?? false),
         isCurrentUser: player.id === currentUserId,
       };
     })
@@ -56,12 +56,18 @@ export function buildMatchPlayerPicks(
 
 export function groupPredictionsByMatch(
   predictions: Array<
-    Pick<Prediction, "user_id" | "match_id" | "predicted_home" | "predicted_away">
+    Pick<
+      Prediction,
+      "user_id" | "match_id" | "predicted_home" | "predicted_away" | "is_default"
+    >
   >
-): Record<number, Record<string, Pick<Prediction, "predicted_home" | "predicted_away">>> {
+): Record<
+  number,
+  Record<string, Pick<Prediction, "predicted_home" | "predicted_away" | "is_default">>
+> {
   const grouped: Record<
     number,
-    Record<string, Pick<Prediction, "predicted_home" | "predicted_away">>
+    Record<string, Pick<Prediction, "predicted_home" | "predicted_away" | "is_default">>
   > = {};
 
   for (const prediction of predictions) {
@@ -71,6 +77,7 @@ export function groupPredictionsByMatch(
     grouped[prediction.match_id][prediction.user_id] = {
       predicted_home: prediction.predicted_home,
       predicted_away: prediction.predicted_away,
+      is_default: prediction.is_default,
     };
   }
 

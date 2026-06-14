@@ -19,6 +19,7 @@ import type { Match, Prediction, Props } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { KickoffCountdown } from "./kickoff-countdown";
 import { MatchCard } from "./match-card";
 import { SearchablePicker } from "./searchable-picker";
@@ -60,6 +61,7 @@ export function PredictPageClient({
   const [topScorer, setTopScorer] = useState(initialProps?.top_scorer ?? "");
   const [savingProps, setSavingProps] = useState(false);
   const [matchesState, setMatchesState] = useState(matches);
+  const [matchView, setMatchView] = useState<"predict" | "past">("predict");
 
   const supabase = createClient();
   const teams = useMemo(
@@ -82,25 +84,48 @@ export function PredictPageClient({
     [teams]
   );
 
-  const nextKickoff = useMemo(() => {
-    const upcoming = matchesState
-      .filter((m) => new Date(m.kickoff_at) > new Date())
-      .sort(
-        (a, b) =>
-          new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime()
-      );
-    return upcoming[0]?.kickoff_at ?? null;
-  }, [matchesState]);
+  const predictMatches = useMemo(
+    () => matchesState.filter((m) => !isMatchLocked(m.kickoff_at)),
+    [matchesState]
+  );
 
-  const groupedMatches = useMemo(() => {
+  const pastMatches = useMemo(
+    () => matchesState.filter((m) => isMatchLocked(m.kickoff_at)),
+    [matchesState]
+  );
+
+  const nextKickoff = useMemo(() => {
+    const upcoming = [...predictMatches].sort(
+      (a, b) =>
+        new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime()
+    );
+    return upcoming[0]?.kickoff_at ?? null;
+  }, [predictMatches]);
+
+  function groupMatchesByDate(
+    matchList: Match[],
+    sortDirection: "asc" | "desc" = "asc"
+  ) {
     const groups: Record<string, Match[]> = {};
-    for (const match of matchesState) {
+    for (const match of matchList) {
       const key = format(new Date(match.kickoff_at), "yyyy-MM-dd");
       if (!groups[key]) groups[key] = [];
       groups[key].push(match);
     }
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  }, [matchesState]);
+    return Object.entries(groups).sort(([a], [b]) =>
+      sortDirection === "asc" ? a.localeCompare(b) : b.localeCompare(a)
+    );
+  }
+
+  const groupedPredictMatches = useMemo(
+    () => groupMatchesByDate(predictMatches),
+    [predictMatches]
+  );
+
+  const groupedPastMatches = useMemo(
+    () => groupMatchesByDate(pastMatches, "desc"),
+    [pastMatches]
+  );
 
   const fireConfetti = useCallback(() => {
     confetti({
@@ -188,7 +213,7 @@ export function PredictPageClient({
     async function refreshAllPredictions() {
       const { data } = await supabase
         .from("predictions")
-        .select("user_id, match_id, predicted_home, predicted_away");
+        .select("user_id, match_id, predicted_home, predicted_away, is_default");
 
       if (data) {
         setPredictionsByMatch(groupPredictionsByMatch(data));
@@ -226,7 +251,7 @@ export function PredictPageClient({
     if (existing) {
       const { data, error } = await supabase
         .from("predictions")
-        .update({ predicted_home: home, predicted_away: away })
+        .update({ predicted_home: home, predicted_away: away, is_default: false })
         .eq("id", existing.id)
         .select()
         .single();
@@ -247,6 +272,7 @@ export function PredictPageClient({
           match_id: matchId,
           predicted_home: home,
           predicted_away: away,
+          is_default: false,
         })
         .select()
         .single();
@@ -301,6 +327,73 @@ export function PredictPageClient({
     toast.success("Props saved!");
   }
 
+  function renderMatchGroups(
+    grouped: [string, Match[]][],
+    emptyMessage: string
+  ) {
+    if (grouped.length === 0) {
+      return (
+        <p className="instrument-meta py-12 text-center">{emptyMessage}</p>
+      );
+    }
+
+    return grouped.map(([date, dayMatches]) => (
+      <div key={date} className="space-y-3">
+        <div className="flex items-baseline justify-between border-b border-border pb-2">
+          <h2 className="instrument-heading text-sm">
+            {format(new Date(date), "EEEE, d MMMM")}
+          </h2>
+          <span className="instrument-meta">
+            {dayMatches.length} Match{dayMatches.length !== 1 ? "es" : ""}
+          </span>
+        </div>
+        {dayMatches.map((match) => {
+          const locked = isLocked(match);
+          const prediction = predictions.find((p) => p.match_id === match.id);
+          const effectivePrediction = getEffectivePrediction(
+            match.kickoff_at,
+            prediction
+          );
+          const score = getScore(match.id);
+
+          const playerPicks = buildMatchPlayerPicks(
+            match.kickoff_at,
+            players,
+            predictionsByMatch[match.id] ?? {},
+            userId
+          );
+
+          return (
+            <MatchCard
+              key={match.id}
+              match={match}
+              prediction={prediction}
+              effectivePrediction={effectivePrediction}
+              locked={locked}
+              playerPicks={playerPicks}
+              homeScore={score.home}
+              awayScore={score.away}
+              onHomeChange={(v) =>
+                setScores((prev) => ({
+                  ...prev,
+                  [match.id]: { ...getScore(match.id), home: v },
+                }))
+              }
+              onAwayChange={(v) =>
+                setScores((prev) => ({
+                  ...prev,
+                  [match.id]: { ...getScore(match.id), away: v },
+                }))
+              }
+              onSave={() => savePrediction(match.id)}
+              saving={savingMatchId === match.id}
+            />
+          );
+        })}
+      </div>
+    ));
+  }
+
   return (
     <div className="space-y-8">
       <header className="border-b border-border pb-5 sm:pb-6">
@@ -312,6 +405,53 @@ export function PredictPageClient({
       </header>
 
       <KickoffCountdown kickoffAt={nextKickoff} />
+
+      {matchesState.length === 0 ? (
+        <p className="instrument-meta py-12 text-center">
+          No matches scheduled yet · Check back soon
+        </p>
+      ) : (
+        <section className="space-y-6">
+          <div className="instrument-panel flex">
+            <button
+              type="button"
+              onClick={() => setMatchView("predict")}
+              className={cn(
+                "flex flex-1 flex-col items-start gap-1 border-r border-border px-4 py-3 text-left transition-colors sm:flex-row sm:items-center sm:justify-between",
+                matchView === "predict"
+                  ? "bg-secondary/30 text-primary"
+                  : "text-foreground/60 hover:bg-secondary/15"
+              )}
+            >
+              <span className="instrument-label">To Predict</span>
+              <span className="instrument-meta">{predictMatches.length}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMatchView("past")}
+              className={cn(
+                "flex flex-1 flex-col items-start gap-1 px-4 py-3 text-left transition-colors sm:flex-row sm:items-center sm:justify-between",
+                matchView === "past"
+                  ? "bg-secondary/30 text-primary"
+                  : "text-foreground/60 hover:bg-secondary/15"
+              )}
+            >
+              <span className="instrument-label">Past Predictions</span>
+              <span className="instrument-meta">{pastMatches.length}</span>
+            </button>
+          </div>
+
+          {matchView === "predict"
+            ? renderMatchGroups(
+                groupedPredictMatches,
+                "No open matches right now · Check past predictions for locked picks"
+              )
+            : renderMatchGroups(
+                groupedPastMatches,
+                "No past predictions yet · Locked and finished matches appear here"
+              )}
+        </section>
+      )}
 
       <Card className="instrument-panel rounded-none py-5 shadow-none ring-0 sm:py-6">
         <CardHeader className="px-6 sm:px-8">
@@ -360,68 +500,6 @@ export function PredictPageClient({
           )}
         </CardContent>
       </Card>
-
-      {groupedMatches.map(([date, dayMatches]) => (
-        <div key={date} className="space-y-3">
-          <div className="flex items-baseline justify-between border-b border-border pb-2">
-            <h2 className="instrument-heading text-sm">
-              {format(new Date(date), "EEEE, d MMMM")}
-            </h2>
-            <span className="instrument-meta">
-              {dayMatches.length} Match{dayMatches.length !== 1 ? "es" : ""}
-            </span>
-          </div>
-          {dayMatches.map((match) => {
-            const locked = isLocked(match);
-            const prediction = predictions.find((p) => p.match_id === match.id);
-            const effectivePrediction = getEffectivePrediction(
-              match.kickoff_at,
-              prediction
-            );
-            const score = getScore(match.id);
-
-            const playerPicks = buildMatchPlayerPicks(
-              match.kickoff_at,
-              players,
-              predictionsByMatch[match.id] ?? {},
-              userId
-            );
-
-            return (
-              <MatchCard
-                key={match.id}
-                match={match}
-                prediction={prediction}
-                effectivePrediction={effectivePrediction}
-                locked={locked}
-                playerPicks={playerPicks}
-                homeScore={score.home}
-                awayScore={score.away}
-                onHomeChange={(v) =>
-                  setScores((prev) => ({
-                    ...prev,
-                    [match.id]: { ...getScore(match.id), home: v },
-                  }))
-                }
-                onAwayChange={(v) =>
-                  setScores((prev) => ({
-                    ...prev,
-                    [match.id]: { ...getScore(match.id), away: v },
-                  }))
-                }
-                onSave={() => savePrediction(match.id)}
-                saving={savingMatchId === match.id}
-              />
-            );
-          })}
-        </div>
-      ))}
-
-      {matchesState.length === 0 && (
-        <p className="instrument-meta py-12 text-center">
-          No matches scheduled yet · Check back soon
-        </p>
-      )}
     </div>
   );
 }

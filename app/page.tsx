@@ -3,6 +3,7 @@ import { LeaderboardTable } from "@/components/leaderboard/leaderboard-table";
 import { RulesSection } from "@/components/leaderboard/rules-section";
 import { applyDefaultPredictions } from "@/lib/apply-default-predictions";
 import { getLeaderboardEntries } from "@/lib/leaderboard-entries";
+import { scorePredictions } from "@/lib/score-predictions";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
@@ -11,6 +12,12 @@ export default async function HomePage() {
     await applyDefaultPredictions(serviceClient);
   } catch {
     // Migration may not be applied yet; leaderboard still works for manual picks.
+  }
+
+  try {
+    await scorePredictions(serviceClient);
+  } catch {
+    // Migration may not be applied yet.
   }
 
   const entries = await getLeaderboardEntries(serviceClient);

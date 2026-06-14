@@ -6,7 +6,7 @@ import {
   groupPredictionsByMatch,
 } from "@/lib/match-predictions";
 import { getEffectivePrediction, isMatchLocked } from "@/lib/predictions";
-import { calculateMatchPoints } from "@/lib/scoring";
+import { awardMatchPoints, formatAwardedPoints } from "@/lib/scoring";
 import { formatTeam, STAGE_LABELS } from "@/lib/teams";
 import { createClient } from "@/lib/supabase/server";
 import { format } from "date-fns";
@@ -38,22 +38,29 @@ export default async function MatchesPage() {
       .order("display_name"),
     supabase
       .from("predictions")
-      .select("user_id, match_id, predicted_home, predicted_away"),
+      .select("user_id, match_id, predicted_home, predicted_away, is_default"),
   ]);
 
   const predictionsByMatch = groupPredictionsByMatch(allPredictions ?? []);
 
-  let predictions: Record<number, { predicted_home: number; predicted_away: number }> = {};
+  let predictions: Record<
+    number,
+    { predicted_home: number; predicted_away: number; is_default: boolean }
+  > = {};
   if (user) {
     const { data } = await supabase
       .from("predictions")
-      .select("match_id, predicted_home, predicted_away")
+      .select("match_id, predicted_home, predicted_away, is_default")
       .eq("user_id", user.id);
     if (data) {
       predictions = Object.fromEntries(
         data.map((p) => [
           p.match_id,
-          { predicted_home: p.predicted_home, predicted_away: p.predicted_away },
+          {
+            predicted_home: p.predicted_home,
+            predicted_away: p.predicted_away,
+            is_default: p.is_default,
+          },
         ])
       );
     }
@@ -87,12 +94,13 @@ export default async function MatchesPage() {
               !!pred && (!!storedPred || isMatchLocked(match.kickoff_at));
             const points =
               pred && match.result_confirmed
-                ? calculateMatchPoints(
+                ? awardMatchPoints(
                     pred.predicted_home,
                     pred.predicted_away,
                     match.home_score,
                     match.away_score,
-                    match.result_confirmed
+                    match.result_confirmed,
+                    pred.isDefault
                   )
                 : null;
 
@@ -152,7 +160,9 @@ export default async function MatchesPage() {
                       </span>
                     )}
                     {points !== null && (
-                      <span className="ml-2 text-accent">+{points} PTS</span>
+                      <span className="ml-2 text-accent">
+                        +{formatAwardedPoints(points)} PTS
+                      </span>
                     )}
                   </p>
                 )}

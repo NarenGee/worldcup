@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { MatchPredictionsList } from "@/components/predict/match-predictions-list";
-import { calculateMatchPoints } from "@/lib/scoring";
+import { awardMatchPoints, calculateMatchPoints, formatAwardedPoints } from "@/lib/scoring";
 import type { MatchPlayerPick } from "@/lib/match-predictions";
 import { STAGE_LABELS } from "@/lib/teams";
 import { TeamWithQuote } from "./team-with-quote";
@@ -41,7 +41,7 @@ export function MatchCard({
   saving,
   playerPicks = [],
 }: MatchCardProps) {
-  const points = match.result_confirmed
+  const basePoints = match.result_confirmed
     ? calculateMatchPoints(
         effectivePrediction.predicted_home,
         effectivePrediction.predicted_away,
@@ -50,6 +50,17 @@ export function MatchCard({
         match.result_confirmed
       )
     : null;
+  const points =
+    basePoints !== null
+      ? awardMatchPoints(
+          effectivePrediction.predicted_home,
+          effectivePrediction.predicted_away,
+          match.home_score,
+          match.away_score,
+          match.result_confirmed,
+          effectivePrediction.isDefault
+        )
+      : null;
 
   const hasChanges =
     prediction?.predicted_home !== homeScore ||
@@ -102,7 +113,7 @@ export function MatchCard({
             </div>
             <div
               className={
-                points === 3
+                basePoints === 3
                   ? "instrument-status-bar"
                   : "instrument-status-bar-accent"
               }
@@ -113,7 +124,9 @@ export function MatchCard({
                 <span className="ml-2 opacity-80">(default)</span>
               )}
               {points !== null && (
-                <span className="ml-2 sm:ml-3">+{points} PTS</span>
+                <span className="ml-2 sm:ml-3">
+                  +{formatAwardedPoints(points)} PTS
+                </span>
               )}
             </div>
           </div>
