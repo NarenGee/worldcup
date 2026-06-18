@@ -1,8 +1,4 @@
-type PhraseBuilder = (ctx: Record<string, string>) => string;
-
-function ctx(names: string, extra: Record<string, string> = {}): Record<string, string> {
-  return { names, ...extra };
-}
+export type PhraseBuilder = (ctx: Record<string, string>) => string;
 
 export const LEAD_EXACT: PhraseBuilder[] = [
   ({ names }) => `${names} called the scoreline exactly; expect smugness at volume.`,

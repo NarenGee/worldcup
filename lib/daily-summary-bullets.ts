@@ -55,7 +55,7 @@ export async function buildFullDailySummaryWithAi(
 
   try {
     const takeRaw = await generateTakeBullets(buildTakePrompt(data, options));
-    let takeLines = normalizeTakeBullets(takeRaw);
+    const takeLines = normalizeTakeBullets(takeRaw);
 
     if (
       takeLines.length === 0 ||

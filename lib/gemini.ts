@@ -18,9 +18,6 @@ const TAKE_SYSTEM_PROMPT =
   "Spread the day's story across all 3 bullets. Never confuse deliberate 1-1 with auto-default 1-1. " +
   "Never use em dashes. Each line starts with '- '. Output exactly 3 lines, no markdown, no quotes.";
 
-/** @deprecated use TAKE_SYSTEM_PROMPT */
-const OPENER_SYSTEM_PROMPT = TAKE_SYSTEM_PROMPT;
-
 export function getGeminiConfig() {
   return {
     model: process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash",
