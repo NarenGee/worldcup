@@ -24,6 +24,7 @@ export type Match = {
   home_score: number | null;
   away_score: number | null;
   result_confirmed: boolean;
+  result_confirmed_at: string | null;
   external_id: string | null;
 };
 
@@ -64,6 +65,14 @@ export type LeaderboardEntry = {
   correct_prediction_rate?: number | null;
 };
 
+export type DailySummary = {
+  summary_date: string;
+  summary: string;
+  content_hash: string;
+  generated_at: string;
+  matches_count: number;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -96,6 +105,7 @@ export type Database = {
           home_score?: number | null;
           away_score?: number | null;
           result_confirmed?: boolean;
+          result_confirmed_at?: string | null;
           external_id?: string | null;
         };
         Update: {
@@ -106,6 +116,7 @@ export type Database = {
           home_score?: number | null;
           away_score?: number | null;
           result_confirmed?: boolean;
+          result_confirmed_at?: string | null;
           external_id?: string | null;
         };
         Relationships: [];
@@ -156,6 +167,23 @@ export type Database = {
           champion?: string | null;
           top_scorer?: string | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      daily_summaries: {
+        Row: DailySummary;
+        Insert: {
+          summary_date: string;
+          summary: string;
+          content_hash: string;
+          generated_at?: string;
+          matches_count?: number;
+        };
+        Update: {
+          summary?: string;
+          content_hash?: string;
+          generated_at?: string;
+          matches_count?: number;
         };
         Relationships: [];
       };

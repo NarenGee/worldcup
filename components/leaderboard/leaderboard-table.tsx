@@ -21,10 +21,19 @@ function rankColor(rank: number): string {
 
 type LeaderboardTableProps = {
   initialEntries: LeaderboardEntry[];
+  entries?: LeaderboardEntry[];
+  viewingLabel?: string;
+  onLiveEntriesChange?: (entries: LeaderboardEntry[]) => void;
 };
 
-export function LeaderboardTable({ initialEntries }: LeaderboardTableProps) {
-  const [entries, setEntries] = useState(initialEntries);
+export function LeaderboardTable({
+  initialEntries,
+  entries: entriesOverride,
+  viewingLabel,
+  onLiveEntriesChange,
+}: LeaderboardTableProps) {
+  const [liveEntries, setLiveEntries] = useState(initialEntries);
+  const entries = entriesOverride ?? liveEntries;
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null);
   const [selectedRank, setSelectedRank] = useState<number | null>(null);
   const supabase = createClient();
@@ -34,7 +43,10 @@ export function LeaderboardTable({ initialEntries }: LeaderboardTableProps) {
       const res = await fetch("/api/leaderboard", { cache: "no-store" });
       if (!res.ok) return;
       const data = (await res.json()) as LeaderboardEntry[];
-      if (Array.isArray(data)) setEntries(data);
+      if (Array.isArray(data)) {
+        setLiveEntries(data);
+        onLiveEntriesChange?.(data);
+      }
     };
 
     fetchLeaderboard();
@@ -73,7 +85,7 @@ export function LeaderboardTable({ initialEntries }: LeaderboardTableProps) {
       window.clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
-  }, [supabase]);
+  }, [supabase, onLiveEntriesChange]);
 
   if (entries.length === 0) {
     return (
@@ -87,8 +99,15 @@ export function LeaderboardTable({ initialEntries }: LeaderboardTableProps) {
     <>
       <div className="instrument-panel">
         <div className="instrument-divider flex items-center justify-between gap-3 px-3 py-3 sm:px-4">
-          <span className="instrument-label">Rankings</span>
-          <span className="instrument-meta">
+          <div className="min-w-0">
+            <span className="instrument-label">
+              {viewingLabel ? "Historical rankings" : "Rankings"}
+            </span>
+            {viewingLabel ? (
+              <p className="instrument-meta mt-0.5 truncate">{viewingLabel}</p>
+            ) : null}
+          </div>
+          <span className="instrument-meta shrink-0">
             <span className="text-wc-blue">{entries.length}</span> players · tap for
             breakdown
           </span>
