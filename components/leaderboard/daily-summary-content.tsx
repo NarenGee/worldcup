@@ -2,7 +2,6 @@ import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
 function parseBulletSummary(summary: string): ReactNode[] {
-  const lines = summary.split("\n");
   const nodes: ReactNode[] = [];
   let listItems: ReactNode[] = [];
   let listKey = 0;
@@ -20,7 +19,7 @@ function parseBulletSummary(summary: string): ReactNode[] {
     listItems = [];
   };
 
-  for (const rawLine of lines) {
+  for (const rawLine of summary.split("\n")) {
     const line = rawLine.trimEnd();
     if (!line.trim()) {
       flushList();
@@ -31,22 +30,14 @@ function parseBulletSummary(summary: string): ReactNode[] {
     if (bulletMatch) {
       const indent = bulletMatch[1].length;
       const text = bulletMatch[2].trim();
-      const isOpenerLead = listItems.length === 0 && indent < 2;
       listItems.push(
         <li
           key={`${listKey}-${listItems.length}`}
           className={cn(
             "relative pl-4 before:absolute before:left-0 before:content-['•'] before:text-primary",
-            indent >= 2 && "ml-4",
-            isOpenerLead &&
-              "border-l-2 border-primary/30 pl-3 text-foreground/90 before:content-none"
+            indent >= 2 && "ml-4"
           )}
         >
-          {isOpenerLead && (
-            <span className="mb-1 block font-display text-[10px] font-black uppercase tracking-widest text-primary">
-              The take
-            </span>
-          )}
           {text}
         </li>
       );
@@ -55,10 +46,7 @@ function parseBulletSummary(summary: string): ReactNode[] {
 
     flushList();
     nodes.push(
-      <p
-        key={`p-${listKey++}`}
-        className="text-sm leading-relaxed text-foreground/90"
-      >
+      <p key={`p-${listKey++}`} className="text-sm leading-relaxed text-foreground/90">
         {line.trim()}
       </p>
     );

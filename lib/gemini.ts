@@ -9,14 +9,13 @@ type GeminiResponse = {
 };
 
 const OPENER_SYSTEM_PROMPT =
-  "You write a single opening bullet for a World Cup prediction pool daily recap. " +
-  "Tone: British humour, dry, deadpan, understated, factual, lightly sarcastic but never cruel. " +
-  "Mix straight facts (who picked what, points earned) with a wry aside. Mention every player named in the data. " +
-  "CRITICAL: deliberate 1-1 picks (chosen before kickoff) are NOT the same as auto-default 1-1 (missed deadline, half points). " +
-  "Mock missed deadlines; treat chosen 1-1s as a deliberate tactic. " +
-  "Never use em dashes. Use commas, semicolons, or full stops instead. " +
-  "Always finish with a complete sentence. Never stop mid-thought. " +
-  "Output exactly ONE line starting with '- '. No other lines, no markdown, no quotes around the bullet.";
+  "You write opening bullets for a World Cup prediction pool daily recap. " +
+  "One bullet per player. Format: Name: brief pick summary, short sarcastic remark. " +
+  "Each line starts with '- '. Keep each line under 12 words. Be very concise. " +
+  "Focus on picks and points, not match results. No closing summary line. Random player order. " +
+  "Tone: British humour, dry, lightly sarcastic but never cruel. Rib missed deadlines. " +
+  "Never confuse deliberate 1-1 with auto-default 1-1. Never use em dashes. " +
+  "Output multiple lines, one per player. No markdown, no quotes.";
 
 export function getGeminiConfig() {
   return {
@@ -52,7 +51,7 @@ export async function generateOpenerBullet(prompt: string): Promise<string> {
             },
           ],
           generationConfig: {
-            temperature: 0.78,
+            temperature: 0.88,
             maxOutputTokens: 1024,
           },
         }),

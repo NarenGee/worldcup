@@ -1,11 +1,5 @@
 import type { DailySummaryData } from "@/lib/daily-summary-data";
-import {
-  buildOpenerFallbackBullet,
-  buildOpenerPrompt,
-  normalizeOpenerBullet,
-} from "@/lib/daily-summary-opener";
 import type { PickKind } from "@/lib/daily-summary-format";
-import { generateOpenerBullet } from "@/lib/gemini";
 import { formatAwardedPoints } from "@/lib/scoring";
 
 type PickEntry = {
@@ -94,33 +88,12 @@ export function buildConciseDailySummary(data: DailySummaryData): string {
   ].join("\n");
 }
 
-/** Instant recap for page loads — template opener, no API wait. */
 export function buildFullDailySummaryFast(data: DailySummaryData): string {
-  const coreBullets = buildConciseDailySummary(data);
-
-  if (data.matches.length === 0) {
-    return coreBullets;
-  }
-
-  const openerBullet = buildOpenerFallbackBullet(data);
-  return `${openerBullet}\n${coreBullets}`;
+  return buildConciseDailySummary(data);
 }
 
-/** Full recap with Gemini opener — backfill / cron only. */
 export async function buildFullDailySummaryWithAi(
   data: DailySummaryData
 ): Promise<string> {
-  const coreBullets = buildConciseDailySummary(data);
-
-  if (data.matches.length === 0) {
-    return coreBullets;
-  }
-
-  try {
-    const openerRaw = await generateOpenerBullet(buildOpenerPrompt(data));
-    const openerBullet = normalizeOpenerBullet(openerRaw);
-    return `${openerBullet}\n${coreBullets}`;
-  } catch {
-    return buildFullDailySummaryFast(data);
-  }
+  return buildConciseDailySummary(data);
 }
