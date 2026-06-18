@@ -131,7 +131,7 @@ export async function getPlayerPointsBreakdown(
   }
 
   matches.sort(
-    (a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime()
+    (a, b) => new Date(b.kickoff_at).getTime() - new Date(a.kickoff_at).getTime()
   );
 
   const actualChampion = tournamentResults?.champion ?? null;
