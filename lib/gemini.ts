@@ -8,14 +8,18 @@ type GeminiResponse = {
   error?: { message?: string };
 };
 
-const OPENER_SYSTEM_PROMPT =
-  "You write opening bullets for a World Cup prediction pool daily recap. " +
-  "One bullet per player. Format: Name: brief pick summary, short sarcastic remark. " +
-  "Each line starts with '- '. Keep each line under 12 words. Be very concise. " +
-  "Focus on picks and points, not match results. No closing summary line. Random player order. " +
-  "Tone: British humour, dry, lightly sarcastic but never cruel. Rib missed deadlines. " +
-  "Never confuse deliberate 1-1 with auto-default 1-1. Never use em dashes. " +
-  "Output multiple lines, one per player. No markdown, no quotes.";
+const TAKE_SYSTEM_PROMPT =
+  "You write The take for a World Cup prediction pool daily recap: exactly 3 bullet lines. " +
+  "Voice: witty British TV commentator, dry, deadpan, lightly sarcastic but never cruel. " +
+  "Summarise how players performed today: picks, points, exact scores, misses, missed deadlines. " +
+  "Do not recap match results or final scores. Mention players by name. " +
+  "Use fresh phrasing every day; vary vocabulary, rhythm, and sentence openings. " +
+  "Never repeat stock phrases or echo recent recap lines provided in the prompt. " +
+  "Spread the day's story across all 3 bullets. Never confuse deliberate 1-1 with auto-default 1-1. " +
+  "Never use em dashes. Each line starts with '- '. Output exactly 3 lines, no markdown, no quotes.";
+
+/** @deprecated use TAKE_SYSTEM_PROMPT */
+const OPENER_SYSTEM_PROMPT = TAKE_SYSTEM_PROMPT;
 
 export function getGeminiConfig() {
   return {
@@ -24,7 +28,16 @@ export function getGeminiConfig() {
   };
 }
 
+export async function generateTakeBullets(prompt: string): Promise<string> {
+  return generateWithSystemPrompt(TAKE_SYSTEM_PROMPT, prompt);
+}
+
+/** @deprecated use generateTakeBullets */
 export async function generateOpenerBullet(prompt: string): Promise<string> {
+  return generateTakeBullets(prompt);
+}
+
+async function generateWithSystemPrompt(systemPrompt: string, prompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not set");
@@ -42,7 +55,7 @@ export async function generateOpenerBullet(prompt: string): Promise<string> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           systemInstruction: {
-            parts: [{ text: OPENER_SYSTEM_PROMPT }],
+            parts: [{ text: systemPrompt }],
           },
           contents: [
             {
@@ -51,7 +64,7 @@ export async function generateOpenerBullet(prompt: string): Promise<string> {
             },
           ],
           generationConfig: {
-            temperature: 0.88,
+            temperature: 0.95,
             maxOutputTokens: 1024,
           },
         }),

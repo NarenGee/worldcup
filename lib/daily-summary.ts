@@ -8,6 +8,7 @@ import {
   hashDailySummaryData,
   listRecapDates,
 } from "@/lib/daily-summary-data";
+import { extractTakeLines } from "@/lib/daily-summary-opener";
 import {
   formatDateInTimezone,
   formatDisplayDate,
@@ -114,15 +115,35 @@ async function writeCachedSummary(
   return generatedAt;
 }
 
+async function getRecentTakeLines(
+  supabase: SupabaseClient<Database>,
+  beforeDate: string,
+  limit = 7
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("daily_summaries")
+    .select("summary")
+    .lt("summary_date", beforeDate)
+    .order("summary_date", { ascending: false })
+    .limit(limit);
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data.flatMap((row) => extractTakeLines(row.summary));
+}
+
 async function generateAndCacheSummary(
   supabase: SupabaseClient<Database>,
   data: Awaited<ReturnType<typeof buildDailySummaryData>>,
-  options?: { useAi?: boolean }
+  options?: { useAi?: boolean; recentTakeLines?: string[] }
 ): Promise<DailySummaryResult> {
   const contentHash = hashDailySummaryData(data);
+  const avoidPhrases = options?.recentTakeLines ?? [];
   const summary = options?.useAi
-    ? await buildFullDailySummaryWithAi(data)
-    : buildFullDailySummaryFast(data);
+    ? await buildFullDailySummaryWithAi(data, { avoidPhrases })
+    : buildFullDailySummaryFast(data, { avoidPhrases });
   const generatedAt = await writeCachedSummary(
     supabase,
     data.date,
@@ -155,7 +176,8 @@ export async function getDailySummary(
   }
 
   const data = await buildDailySummaryData(supabase, targetDate);
-  return generateAndCacheSummary(supabase, data);
+  const recentTakeLines = await getRecentTakeLines(supabase, targetDate);
+  return generateAndCacheSummary(supabase, data, { recentTakeLines });
 }
 
 export async function getDailySummaryBootstrap(
@@ -175,6 +197,7 @@ export async function backfillDailySummaries(
 ): Promise<BackfillSummaryResult[]> {
   const { dates } = await listRecapDates(supabase);
   const results: BackfillSummaryResult[] = [];
+  const sessionTakeLines: string[] = [];
 
   for (const dateStr of dates) {
     const data = await buildDailySummaryData(supabase, dateStr);
@@ -188,14 +211,22 @@ export async function backfillDailySummaries(
     if (!options?.force) {
       const cached = await readCachedSummary(supabase, dateStr, contentHash);
       if (cached) {
+        sessionTakeLines.push(...extractTakeLines(cached.summary));
         results.push({ date: dateStr, status: "skipped", reason: "cache" });
         continue;
       }
     }
 
+    const recentTakeLines = [
+      ...sessionTakeLines,
+      ...(await getRecentTakeLines(supabase, dateStr)),
+    ];
+
     const generated = await generateAndCacheSummary(supabase, data, {
       useAi: true,
+      recentTakeLines,
     });
+    sessionTakeLines.push(...extractTakeLines(generated.summary));
     results.push({
       date: dateStr,
       status: "generated",

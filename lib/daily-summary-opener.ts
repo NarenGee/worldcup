@@ -1,5 +1,18 @@
 import type { DailySummaryData, DailySummaryMatch } from "@/lib/daily-summary-data";
 import { formatAwardedPoints } from "@/lib/scoring";
+import {
+  CLOSE_ALL_SCORED,
+  CLOSE_ALL_ZERO,
+  CLOSE_SOME_ZERO,
+  EMPTY_DAY,
+  LEAD_BLANK,
+  LEAD_EXACT,
+  LEAD_TOP,
+  MIDDLE_CLEAN,
+  MIDDLE_DEADLINE,
+  MIDDLE_DELIBERATE_11,
+  type PhraseBuilder,
+} from "@/lib/take-phrase-pools";
 
 export type PlayerDayPick = {
   name: string;
@@ -22,14 +35,17 @@ type PlayerDayRollup = {
   chosen_one_one_count: number;
 };
 
-const SECTION_LABEL =
-  /^(Results|Best picks|Deliberate 1-1 picks|Missed deadline|Standings|No results)/;
+export type TakeGenerationOptions = {
+  avoidPhrases?: string[];
+};
+
+const SECTION_LABEL = /^(Results|No results)/;
 
 function shortMatchLabel(match: DailySummaryMatch): string {
   return `${match.home_team} v ${match.away_team}`;
 }
 
-export function sanitizeOpenerText(text: string): string {
+export function sanitizeTakeText(text: string): string {
   return text
     .replace(/\s*—\s*/g, ", ")
     .replace(/—/g, ", ")
@@ -38,9 +54,32 @@ export function sanitizeOpenerText(text: string): string {
     .trim();
 }
 
-export function isOpenerBulletLine(text: string): boolean {
+/** @deprecated use sanitizeTakeText */
+export function sanitizeOpenerText(text: string): string {
+  return sanitizeTakeText(text);
+}
+
+export function isTakeBulletLine(text: string): boolean {
   const label = text.split(":")[0]?.trim() ?? "";
   return label.length > 0 && !SECTION_LABEL.test(label);
+}
+
+/** @deprecated use isTakeBulletLine */
+export function isOpenerBulletLine(text: string): boolean {
+  return isTakeBulletLine(text);
+}
+
+export function extractTakeLines(summary: string): string[] {
+  const lines: string[] = [];
+
+  for (const rawLine of summary.split("\n")) {
+    const text = rawLine.replace(/^[-•]\s*/, "").trim();
+    if (!text) continue;
+    if (!isTakeBulletLine(text)) break;
+    lines.push(text);
+  }
+
+  return lines;
 }
 
 function hashDate(date: string): number {
@@ -51,24 +90,53 @@ function hashDate(date: string): number {
   return hash;
 }
 
-function pickFrom<T>(items: T[], seed: string): T {
-  return items[hashDate(seed) % items.length];
+function normalizeForCompare(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function shuffleByDate<T>(items: T[], date: string): T[] {
-  const shuffled = [...items];
-  let seed = hashDate(date);
+function sharesLongPhrase(candidate: string, previous: string, minWords = 4): boolean {
+  const prev = normalizeForCompare(previous);
+  const words = normalizeForCompare(candidate).split(" ").filter(Boolean);
 
-  for (let i = shuffled.length - 1; i > 0; i -= 1) {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    const j = seed % (i + 1);
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  for (let i = 0; i <= words.length - minWords; i += 1) {
+    const phrase = words.slice(i, i + minWords).join(" ");
+    if (phrase.length >= 18 && prev.includes(phrase)) {
+      return true;
+    }
   }
 
-  return shuffled;
+  return false;
 }
 
-export function collectPlayerDayPicks(data: DailySummaryData): PlayerDayPick[] {
+function isTooSimilarToRecent(candidate: string, recent: string[]): boolean {
+  const normalized = normalizeForCompare(candidate);
+  return recent.some((line) => {
+    const other = normalizeForCompare(line);
+    if (normalized === other) return true;
+    return sharesLongPhrase(candidate, line);
+  });
+}
+
+function pickRotatingPhrase(
+  pool: PhraseBuilder[],
+  seed: string,
+  slot: number,
+  phraseContext: Record<string, string>,
+  avoid: string[]
+): string {
+  const start = (hashDate(seed) + slot * 7919) % pool.length;
+
+  for (let i = 0; i < pool.length; i += 1) {
+    const candidate = pool[(start + i) % pool.length](phraseContext);
+    if (!isTooSimilarToRecent(candidate, avoid)) {
+      return candidate;
+    }
+  }
+
+  return pool[start](phraseContext);
+}
+
+function collectPlayerDayPicks(data: DailySummaryData): PlayerDayPick[] {
   const byName = new Map<string, PlayerDayPick[]>();
 
   for (const match of data.matches) {
@@ -92,21 +160,15 @@ export function collectPlayerDayPicks(data: DailySummaryData): PlayerDayPick[] {
     data.player_totals.map((player) => [player.display_name, player.points_today])
   );
 
-  return Array.from(byName.entries())
-    .flatMap(([name, picks]) =>
-      picks.map((pick) => ({
-        ...pick,
-        points_today: totals.get(name) ?? 0,
-      }))
-    )
-    .sort(
-      (a, b) =>
-        a.name.localeCompare(b.name) ||
-        a.match.localeCompare(b.match)
-    );
+  return Array.from(byName.entries()).flatMap(([name, picks]) =>
+    picks.map((pick) => ({
+      ...pick,
+      points_today: totals.get(name) ?? 0,
+    }))
+  );
 }
 
-export function rollupPlayersByDay(data: DailySummaryData): PlayerDayRollup[] {
+function rollupPlayersByDay(data: DailySummaryData): PlayerDayRollup[] {
   const picks = collectPlayerDayPicks(data);
   const byName = new Map<string, PlayerDayPick[]>();
 
@@ -116,7 +178,7 @@ export function rollupPlayersByDay(data: DailySummaryData): PlayerDayRollup[] {
     byName.set(pick.name, existing);
   }
 
-  const rollups = Array.from(byName.entries()).map(([name, playerPicks]) => ({
+  return Array.from(byName.entries()).map(([name, playerPicks]) => ({
     name,
     points_today: playerPicks[0]?.points_today ?? 0,
     picks: playerPicks,
@@ -128,153 +190,183 @@ export function rollupPlayersByDay(data: DailySummaryData): PlayerDayRollup[] {
       (pick) => pick.pick_kind === "chosen_one_one"
     ).length,
   }));
-
-  return shuffleByDate(rollups, data.date);
 }
 
-function concisePerformance(player: PlayerDayRollup): string {
-  const pts = formatAwardedPoints(player.points_today);
-
-  if (player.picks.length === 1) {
-    const pick = player.picks[0];
-    if (pick.result === "exact") {
-      return `${pick.predicted_score} exact, ${pts} pts`;
-    }
-    if (pick.pick_kind === "default") {
-      return `no pick, auto 1-1, ${pts} pts`;
-    }
-    if (pick.pick_kind === "chosen_one_one") {
-      return `1-1 by choice, ${pts} pts`;
-    }
-    if (pick.result === "outcome") {
-      return `right result, ${pts} pts`;
-    }
-    return `${pick.predicted_score}, ${pts} pts`;
-  }
-
-  const bits: string[] = [];
-  if (player.exact_count) bits.push(`${player.exact_count} exact`);
-  if (player.outcome_count) bits.push(`${player.outcome_count} outcome`);
-  if (player.miss_count) bits.push(`${player.miss_count} miss`);
-  if (player.default_count) bits.push(`${player.default_count} late`);
-
-  return `${pts} pts (${bits.join(", ")})`;
+function formatPlayerList(names: string[]): string {
+  if (names.length === 0) return "";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
 }
 
-function sarcasticRemark(player: PlayerDayRollup, date: string): string {
-  const seed = `${date}:${player.name}`;
+function buildFallbackCommentary(
+  data: DailySummaryData,
+  rollups: PlayerDayRollup[],
+  avoidPhrases: string[]
+): string[] {
+  const seed = data.date;
+  const used = [...avoidPhrases];
+  const exactHeroes = rollups.filter((player) => player.exact_count > 0);
+  const topScorer = [...rollups].sort((a, b) => b.points_today - a.points_today)[0];
+  const deadlineSkippers = rollups.filter((player) => player.default_count > 0);
+  const zeroes = rollups.filter((player) => player.points_today === 0);
+  const deliberateOnes = rollups.filter((player) => player.chosen_one_one_count > 0);
 
-  if (player.default_count > 0 && player.default_count === player.picks.length) {
-    return pickFrom(
-      ["deadline optional", "half points for nothing", "forgot to pick", "asleep at the wheel"],
-      seed
-    );
+  const pick = (pool: PhraseBuilder[], slot: number, ctx: Record<string, string>) => {
+    const line = pickRotatingPhrase(pool, seed, slot, ctx, used);
+    used.push(line);
+    return line;
+  };
+
+  let lead: string;
+  if (exactHeroes.length > 0) {
+    lead = pick(LEAD_EXACT, 0, {
+      names: formatPlayerList(exactHeroes.map((player) => player.name)),
+    });
+  } else if (topScorer && topScorer.points_today > 0) {
+    lead = pick(LEAD_TOP, 0, {
+      name: topScorer.name,
+      pts: formatAwardedPoints(topScorer.points_today),
+    });
+  } else {
+    lead = pick(LEAD_BLANK, 0, {});
   }
 
-  if (player.exact_count > 0 && player.miss_count === 0 && player.default_count === 0) {
-    return pickFrom(
-      ["insufferable", "won't shut up about it", "on the money", "victory lap incoming"],
-      seed
-    );
+  let middle: string;
+  if (deadlineSkippers.length > 0) {
+    middle = pick(MIDDLE_DEADLINE, 1, {
+      names: formatPlayerList(deadlineSkippers.map((player) => player.name)),
+    });
+  } else if (deliberateOnes.length > 0) {
+    middle = pick(MIDDLE_DELIBERATE_11, 1, {
+      names: formatPlayerList(deliberateOnes.map((player) => player.name)),
+    });
+  } else {
+    middle = pick(MIDDLE_CLEAN, 1, {});
   }
 
-  if (player.exact_count > 0) {
-    return pickFrom(["part oracle", "one right counts", "flashes of genius"], seed);
+  let close: string;
+  if (zeroes.length === rollups.length) {
+    close = pick(CLOSE_ALL_ZERO, 2, {});
+  } else if (zeroes.length > 0) {
+    close = pick(CLOSE_SOME_ZERO, 2, {
+      names: formatPlayerList(zeroes.map((player) => player.name)),
+    });
+  } else {
+    close = pick(CLOSE_ALL_SCORED, 2, {});
   }
 
-  if (player.default_count > 0) {
-    return pickFrom(["auto 1-1 bail-out", "deadline was a suggestion", "still wanted full credit"], seed);
-  }
-
-  if (player.chosen_one_one_count > 0 && player.points_today > 0) {
-    return pickFrom(["1-1 paid off", "bored or clever", "safe and rewarded"], seed);
-  }
-
-  if (player.outcome_count > 0 && player.points_today > 0) {
-    return pickFrom(["right idea", "close enough", "nearly had it"], seed);
-  }
-
-  if (player.points_today === 0) {
-    return pickFrom(["all wrong", "blank day", "optimism unrewarded", "zero to show"], seed);
-  }
-
-  return pickFrom(["mixed bag", "could be worse", "points on the board"], seed);
+  return [lead, middle, close];
 }
 
-function playerTake(player: PlayerDayRollup, date: string): string {
-  return `${player.name}: ${concisePerformance(player)}, ${sarcasticRemark(player, date)}`;
+function buildEmptyDayTake(seed: string, avoidPhrases: string[]): string {
+  const used = [...avoidPhrases];
+  const lines: string[] = [];
+
+  for (let slot = 0; slot < 3; slot += 1) {
+    lines.push(pickRotatingPhrase(EMPTY_DAY, seed, slot, {}, used));
+    used.push(lines.at(-1)!);
+  }
+
+  return lines.map((line) => `- ${line}`).join("\n");
 }
 
-export function buildOpenerPrompt(data: DailySummaryData): string {
+export function buildTakePrompt(
+  data: DailySummaryData,
+  options?: TakeGenerationOptions
+): string {
   const rollups = rollupPlayersByDay(data);
-  const players = rollups.map((player) => player.name);
+  const avoidPhrases = options?.avoidPhrases ?? [];
 
   const lines = [
     `Date: ${data.date_label}`,
-    `Players (every one, random order): ${players.join(", ")}`,
     "",
-    "About each player's picks today, not match results.",
+    "Write exactly 3 bullet lines for The take: witty British commentator commentary on how players performed today.",
+    "Focus on picks, points, exact scores, misses, and missed deadlines. Do not recap match results.",
+    "Use fresh phrasing unique to this date. Vary sentence structure and vocabulary every day.",
+    "Do not reuse wording from recent recaps listed below.",
     "",
-    "Data:",
+    "Pick types:",
+    "- deliberate 1-1: chosen 1-1 before kickoff",
+    "- auto-default 1-1: missed deadline, half points",
+    "",
+    "Player data:",
   ];
 
   for (const player of rollups) {
-    lines.push(`- ${player.name}: ${formatAwardedPoints(player.points_today)} pts`);
+    lines.push(`- ${player.name}: ${formatAwardedPoints(player.points_today)} pts today`);
     for (const pick of player.picks) {
       lines.push(
-        `  · ${pick.match}: ${pick.predicted_score} (${pick.pick_kind}, ${pick.result}, ${pick.points} pts)`
+        `  · ${pick.match}: picked ${pick.predicted_score} (${pick.pick_kind}, ${pick.result}, ${pick.points} pts)`
       );
+    }
+  }
+
+  if (avoidPhrases.length > 0) {
+    lines.push("", "Recent lines to avoid echoing (do not copy phrases or structure):");
+    for (const phrase of avoidPhrases.slice(0, 21)) {
+      lines.push(`- ${phrase}`);
     }
   }
 
   lines.push(
     "",
-    "Write one bullet per player. Each line starts with '- '.",
-    "Format: Name: brief pick summary, short sarcastic remark. Under 12 words per line.",
-    "Be very concise. No match recaps. No closing line. Random player order.",
-    "Rib missed deadlines; never confuse deliberate 1-1 with auto-default 1-1.",
-    "Never use em dashes.",
-    "",
-    "Example:",
-    "- Alice: 2-1 exact, 3 pts, insufferable",
-    "- Bob: no pick, 1.5 pts, deadline optional"
+    "Output exactly 3 lines, each starting with '- '.",
+    "British humour, dry, deadpan, like a TV commentator wrapping up the day.",
+    "Mention players by name. Spread the story across all 3 bullets.",
+    "Never confuse deliberate 1-1 with auto-default 1-1. Never use em dashes.",
+    "No match score recaps. No fourth bullet."
   );
 
   return lines.join("\n");
 }
 
-export function buildOpenerFallbackBullets(data: DailySummaryData): string {
+/** @deprecated use buildTakePrompt */
+export function buildOpenerPrompt(data: DailySummaryData): string {
+  return buildTakePrompt(data);
+}
+
+export function buildTakeFallbackBullets(
+  data: DailySummaryData,
+  options?: TakeGenerationOptions
+): string {
+  const avoidPhrases = options?.avoidPhrases ?? [];
   const rollups = rollupPlayersByDay(data);
+
   if (rollups.length === 0) {
-    return "- Quiet day, no picks to judge.";
+    return buildEmptyDayTake(data.date, avoidPhrases);
   }
 
-  return rollups.map((player) => `- ${playerTake(player, data.date)}`).join("\n");
+  return buildFallbackCommentary(data, rollups, avoidPhrases)
+    .map((line) => `- ${line}`)
+    .join("\n");
 }
 
-/** @deprecated use buildOpenerFallbackBullets */
-export function buildOpenerFallbackBullet(data: DailySummaryData): string {
-  return buildOpenerFallbackBullets(data);
+/** @deprecated use buildTakeFallbackBullets */
+export function buildOpenerFallbackBullets(data: DailySummaryData): string {
+  return buildTakeFallbackBullets(data);
 }
 
+export function takeLinesAreTooRepetitive(
+  lines: string[],
+  avoidPhrases: string[]
+): boolean {
+  return lines.some((line) => isTooSimilarToRecent(line, avoidPhrases));
+}
+
+export function normalizeTakeBullets(text: string): string[] {
+  return sanitizeTakeText(text)
+    .split(/\n+/)
+    .map((line) => line.replace(/^[-•]\s*/, "").trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
+export function formatTakeBullets(lines: string[]): string {
+  return lines.map((line) => `- ${line}`).join("\n");
+}
+
+/** @deprecated use normalizeTakeBullets + formatTakeBullets */
 export function normalizeOpenerBullets(text: string): string {
-  const trimmed = sanitizeOpenerText(text.trim());
-  const rawLines = trimmed.split(/\n+/).map((line) => line.replace(/^[-•]\s*/, "").trim()).filter(Boolean);
-
-  const bullets: string[] = [];
-
-  for (const line of rawLines) {
-    const parts = line.split(/;\s*(?=[^:;]+:)/);
-    for (const part of parts) {
-      const cleaned = part.trim();
-      if (cleaned) bullets.push(`- ${cleaned}`);
-    }
-  }
-
-  return bullets.join("\n");
-}
-
-/** @deprecated use normalizeOpenerBullets */
-export function normalizeOpenerBullet(text: string): string {
-  return normalizeOpenerBullets(text);
+  return formatTakeBullets(normalizeTakeBullets(text));
 }
