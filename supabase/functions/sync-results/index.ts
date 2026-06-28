@@ -20,9 +20,30 @@ type ApiMatch = {
   homeTeam: { name: string | null };
   awayTeam: { name: string | null };
   score: {
+    duration?: string;
     fullTime: { home: number | null; away: number | null };
+    regularTime?: { home: number | null; away: number | null };
   };
 };
+
+// Predictions are settled on the 90-minute result only, so extra time and
+// penalty shootouts are excluded. football-data.org aggregates those into
+// score.fullTime, but exposes the 90-minute score via score.regularTime
+// whenever a match goes beyond regulation. For matches decided in regular
+// time, regularTime is absent and fullTime already equals the 90-minute score.
+function getRegularTimeScore(score: ApiMatch["score"]): {
+  home: number | null;
+  away: number | null;
+} {
+  const regular = score?.regularTime;
+  if (regular && (regular.home !== null || regular.away !== null)) {
+    return { home: regular.home, away: regular.away };
+  }
+  return {
+    home: score?.fullTime?.home ?? null,
+    away: score?.fullTime?.away ?? null,
+  };
+}
 
 const FINISHED_STATUSES = new Set(["FINISHED", "AWARDED"]);
 
@@ -206,8 +227,9 @@ Deno.serve(async (req) => {
 
       const externalId = String(match.id);
       const isFinished = isResultConfirmed(match.status);
-      const homeScore = match.score?.fullTime?.home ?? null;
-      const awayScore = match.score?.fullTime?.away ?? null;
+      const { home: homeScore, away: awayScore } = getRegularTimeScore(
+        match.score
+      );
 
       const result = await upsertMatchFromApi(supabase, {
         stage,
