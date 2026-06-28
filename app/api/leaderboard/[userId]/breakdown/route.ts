@@ -1,6 +1,8 @@
 import { getPlayerPointsBreakdown } from "@/lib/player-breakdown";
 import { createServiceClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 type RouteContext = {
   params: Promise<{ userId: string }>;
 };
