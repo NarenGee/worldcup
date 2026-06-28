@@ -8,6 +8,8 @@ import { getLeaderboardEntries } from "@/lib/leaderboard-entries";
 import { scorePredictions } from "@/lib/score-predictions";
 import { createServiceClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const serviceClient = createServiceClient();
   try {

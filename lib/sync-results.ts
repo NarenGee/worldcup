@@ -1,11 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { applyDefaultPredictions } from "@/lib/apply-default-predictions";
-import { isResultConfirmed, upsertMatchFromApi } from "@/lib/match-sync";
+import { isResultConfirmed, TBD_TEAM, upsertMatchFromApi } from "@/lib/match-sync";
 import { scorePredictions } from "@/lib/score-predictions";
 import type { Database } from "@/lib/supabase/types";
 
 const STAGE_MAP: Record<string, string> = {
   GROUP_STAGE: "group",
+  LAST_32: "r32",
   LAST_16: "r16",
   QUARTER_FINALS: "qf",
   SEMI_FINALS: "sf",
@@ -18,8 +19,8 @@ type ApiMatch = {
   stage: string;
   status: string;
   utcDate: string;
-  homeTeam: { name: string };
-  awayTeam: { name: string };
+  homeTeam: { name: string | null };
+  awayTeam: { name: string | null };
   score: {
     fullTime: { home: number | null; away: number | null };
   };
@@ -63,8 +64,8 @@ export async function syncResultsFromApi(
 
     const result = await upsertMatchFromApi(supabase, {
       stage: stage as Database["public"]["Tables"]["matches"]["Insert"]["stage"],
-      home_team: match.homeTeam.name,
-      away_team: match.awayTeam.name,
+      home_team: match.homeTeam.name ?? TBD_TEAM,
+      away_team: match.awayTeam.name ?? TBD_TEAM,
       kickoff_at: match.utcDate,
       home_score: isFinished ? homeScore : null,
       away_score: isFinished ? awayScore : null,

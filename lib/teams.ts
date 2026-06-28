@@ -91,6 +91,7 @@ export function getUniqueTeamsFromMatches(
 
 export const STAGE_LABELS: Record<string, string> = {
   group: "Group Stage",
+  r32: "Round of 32",
   r16: "Round of 16",
   qf: "Quarter-finals",
   sf: "Semi-finals",

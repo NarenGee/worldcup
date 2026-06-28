@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const STAGE_MAP: Record<string, string> = {
   GROUP_STAGE: "group",
+  LAST_32: "r32",
   LAST_16: "r16",
   QUARTER_FINALS: "qf",
   SEMI_FINALS: "sf",
@@ -9,13 +10,15 @@ const STAGE_MAP: Record<string, string> = {
   THIRD_PLACE: "final",
 };
 
+const TBD_TEAM = "TBD";
+
 type ApiMatch = {
   id: number;
   stage: string;
   status: string;
   utcDate: string;
-  homeTeam: { name: string };
-  awayTeam: { name: string };
+  homeTeam: { name: string | null };
+  awayTeam: { name: string | null };
   score: {
     fullTime: { home: number | null; away: number | null };
   };
@@ -25,6 +28,10 @@ const FINISHED_STATUSES = new Set(["FINISHED", "AWARDED"]);
 
 function isResultConfirmed(status: string): boolean {
   return FINISHED_STATUSES.has(status);
+}
+
+function isPlaceholderTeam(team: string): boolean {
+  return team === TBD_TEAM;
 }
 
 async function findMatchByFixture(
@@ -72,14 +79,20 @@ async function upsertMatchFromApi(
     external_id: string;
   }
 ): Promise<"upserted" | "skipped"> {
+  const teamsAreDecided =
+    !isPlaceholderTeam(payload.home_team) &&
+    !isPlaceholderTeam(payload.away_team);
+
   const [byExternalId, byFixture] = await Promise.all([
     findMatchByExternalId(supabase, payload.external_id),
-    findMatchByFixture(
-      supabase,
-      payload.home_team,
-      payload.away_team,
-      payload.kickoff_at
-    ),
+    teamsAreDecided
+      ? findMatchByFixture(
+          supabase,
+          payload.home_team,
+          payload.away_team,
+          payload.kickoff_at
+        )
+      : Promise.resolve(null),
   ]);
 
   if (byFixture && byExternalId && byFixture.id !== byExternalId.id) {
@@ -89,6 +102,10 @@ async function upsertMatchFromApi(
       .eq("id", byExternalId.id);
 
     if (deleteError) {
+      console.error(
+        `[sync-results] delete failed for external_id=${payload.external_id}:`,
+        deleteError.message
+      );
       return "skipped";
     }
 
@@ -97,6 +114,12 @@ async function upsertMatchFromApi(
       .update(payload)
       .eq("id", byFixture.id);
 
+    if (error) {
+      console.error(
+        `[sync-results] update failed for external_id=${payload.external_id}:`,
+        error.message
+      );
+    }
     return error ? "skipped" : "upserted";
   }
 
@@ -108,10 +131,22 @@ async function upsertMatchFromApi(
       .update(payload)
       .eq("id", target.id);
 
+    if (error) {
+      console.error(
+        `[sync-results] update failed for external_id=${payload.external_id}:`,
+        error.message
+      );
+    }
     return error ? "skipped" : "upserted";
   }
 
   const { error } = await supabase.from("matches").insert(payload);
+  if (error) {
+    console.error(
+      `[sync-results] insert failed for external_id=${payload.external_id}:`,
+      error.message
+    );
+  }
   return error ? "skipped" : "upserted";
 }
 
@@ -176,8 +211,8 @@ Deno.serve(async (req) => {
 
       const result = await upsertMatchFromApi(supabase, {
         stage,
-        home_team: match.homeTeam.name,
-        away_team: match.awayTeam.name,
+        home_team: match.homeTeam.name ?? TBD_TEAM,
+        away_team: match.awayTeam.name ?? TBD_TEAM,
         kickoff_at: match.utcDate,
         home_score: isFinished ? homeScore : null,
         away_score: isFinished ? awayScore : null,

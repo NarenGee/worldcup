@@ -19,8 +19,15 @@ export type ApiMatchPayload = {
 
 const FINISHED_STATUSES = new Set(["FINISHED", "AWARDED"]);
 
+// Placeholder for knockout fixtures whose teams aren't decided yet.
+export const TBD_TEAM = "TBD";
+
 export function isResultConfirmed(status: string): boolean {
   return FINISHED_STATUSES.has(status);
+}
+
+function isPlaceholderTeam(team: string): boolean {
+  return team === TBD_TEAM;
 }
 
 async function findMatchByFixture(
@@ -59,14 +66,23 @@ export async function upsertMatchFromApi(
   supabase: SupabaseClient<Database>,
   payload: ApiMatchPayload
 ): Promise<"upserted" | "skipped"> {
+  // Undecided knockout fixtures share placeholder names ("TBD"), so matching by
+  // fixture would collapse distinct matches together. For those, rely solely on
+  // the unique external_id.
+  const teamsAreDecided =
+    !isPlaceholderTeam(payload.home_team) &&
+    !isPlaceholderTeam(payload.away_team);
+
   const [byExternalId, byFixture] = await Promise.all([
     findMatchByExternalId(supabase, payload.external_id),
-    findMatchByFixture(
-      supabase,
-      payload.home_team,
-      payload.away_team,
-      payload.kickoff_at
-    ),
+    teamsAreDecided
+      ? findMatchByFixture(
+          supabase,
+          payload.home_team,
+          payload.away_team,
+          payload.kickoff_at
+        )
+      : Promise.resolve(null),
   ]);
 
   if (
@@ -80,6 +96,10 @@ export async function upsertMatchFromApi(
       .eq("id", byExternalId.id);
 
     if (deleteError) {
+      console.error(
+        `[match-sync] delete failed for external_id=${payload.external_id}:`,
+        deleteError.message
+      );
       return "skipped";
     }
 
@@ -88,6 +108,12 @@ export async function upsertMatchFromApi(
       .update(payload)
       .eq("id", byFixture.id);
 
+    if (error) {
+      console.error(
+        `[match-sync] update failed for external_id=${payload.external_id}:`,
+        error.message
+      );
+    }
     return error ? "skipped" : "upserted";
   }
 
@@ -99,9 +125,21 @@ export async function upsertMatchFromApi(
       .update(payload)
       .eq("id", target.id);
 
+    if (error) {
+      console.error(
+        `[match-sync] update failed for external_id=${payload.external_id}:`,
+        error.message
+      );
+    }
     return error ? "skipped" : "upserted";
   }
 
   const { error } = await supabase.from("matches").insert(payload);
+  if (error) {
+    console.error(
+      `[match-sync] insert failed for external_id=${payload.external_id}:`,
+      error.message
+    );
+  }
   return error ? "skipped" : "upserted";
 }

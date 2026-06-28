@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { PlayerAvatar } from "@/components/avatar/player-avatar";
 import {
   Dialog,
@@ -8,7 +9,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { PlayerPointsBreakdown } from "@/lib/player-breakdown";
+import type { MatchPredictionsResult } from "@/lib/match-prediction-results";
+import type {
+  MatchBreakdownLine,
+  PlayerPointsBreakdown,
+} from "@/lib/player-breakdown";
 import { formatAwardedPoints } from "@/lib/scoring";
 import { STAGE_LABELS } from "@/lib/teams";
 import type { LeaderboardEntry } from "@/lib/supabase/types";
@@ -64,6 +69,171 @@ function PointsBadge({
         {pointsLabel(points, resultLabel, isDefault)}
       </span>
     </span>
+  );
+}
+
+function OtherPredictionsList({
+  matchId,
+  currentUserId,
+}: {
+  matchId: number;
+  currentUserId: string;
+}) {
+  const [data, setData] = useState<MatchPredictionsResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/matches/${matchId}/predictions`);
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          throw new Error(json.error ?? "Failed to load predictions");
+        }
+        const json = (await res.json()) as MatchPredictionsResult;
+        if (!cancelled) setData(json);
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : "Failed to load predictions"
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [matchId]);
+
+  if (loading) {
+    return (
+      <p className="instrument-meta py-3 text-center">Loading predictions…</p>
+    );
+  }
+
+  if (error) {
+    return <p className="py-3 text-center text-sm text-destructive">{error}</p>;
+  }
+
+  const others = (data?.predictions ?? []).filter(
+    (prediction) => prediction.user_id !== currentUserId
+  );
+
+  if (others.length === 0) {
+    return (
+      <p className="instrument-meta py-3 text-center">
+        No other players predicted this match
+      </p>
+    );
+  }
+
+  return (
+    <ul className="mt-3 divide-y divide-border border border-border bg-background/40">
+      {others.map((prediction) => (
+        <li
+          key={prediction.user_id}
+          className="flex items-center justify-between gap-3 px-3 py-2"
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            <PlayerAvatar
+              displayName={prediction.display_name}
+              avatarUrl={prediction.avatar_url}
+              interactive={false}
+              className="size-7 shrink-0 border border-border"
+              fallbackClassName="bg-secondary font-mono text-[10px] text-secondary-foreground"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-sm text-foreground">
+                {prediction.display_name}
+              </p>
+              <p className="instrument-meta">
+                Pick{" "}
+                {formatScore(
+                  prediction.predicted_home,
+                  prediction.predicted_away
+                )}
+                {prediction.is_default && (
+                  <span className="ml-1.5 normal-case">(default)</span>
+                )}
+              </p>
+            </div>
+          </div>
+          <PointsBadge
+            points={prediction.points}
+            resultLabel={prediction.result_label}
+            isDefault={prediction.is_default}
+          />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function MatchRow({
+  match,
+  currentUserId,
+}: {
+  match: MatchBreakdownLine;
+  currentUserId: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <li className="px-3 py-3">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+        className="flex w-full items-start justify-between gap-3 text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="instrument-meta">
+            {STAGE_LABELS[match.stage] ?? match.stage}
+            <span className="mx-1.5">·</span>
+            {format(new Date(match.kickoff_at), "MMM d")}
+          </p>
+          <p className="mt-1 font-display text-xs font-bold uppercase tracking-wide sm:text-sm">
+            {match.home_team} vs {match.away_team}
+          </p>
+          <p className="instrument-meta mt-1.5">
+            Pick {formatScore(match.predicted_home, match.predicted_away)}
+            {match.is_default && (
+              <span className="ml-1.5 normal-case">(default)</span>
+            )}
+            <span className="mx-1.5">·</span>
+            Actual {formatScore(match.actual_home, match.actual_away)}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <PointsBadge
+            points={match.points}
+            resultLabel={match.result_label}
+            isDefault={match.is_default}
+          />
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform",
+              expanded && "rotate-180"
+            )}
+          />
+        </div>
+      </button>
+      {expanded && (
+        <OtherPredictionsList
+          matchId={match.match_id}
+          currentUserId={currentUserId}
+        />
+      )}
+    </li>
   );
 }
 
@@ -206,33 +376,11 @@ export function PlayerBreakdownDialog({
               ) : (
                 <ul className="divide-y divide-border border border-border">
                   {breakdown.matches.map((match) => (
-                    <li key={match.match_id} className="px-3 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="instrument-meta">
-                            {STAGE_LABELS[match.stage] ?? match.stage}
-                            <span className="mx-1.5">·</span>
-                            {format(new Date(match.kickoff_at), "MMM d")}
-                          </p>
-                          <p className="mt-1 font-display text-xs font-bold uppercase tracking-wide sm:text-sm">
-                            {match.home_team} vs {match.away_team}
-                          </p>
-                          <p className="instrument-meta mt-1.5">
-                            Pick {formatScore(match.predicted_home, match.predicted_away)}
-                            {match.is_default && (
-                              <span className="ml-1.5 normal-case">(default)</span>
-                            )}
-                            <span className="mx-1.5">·</span>
-                            Actual {formatScore(match.actual_home, match.actual_away)}
-                          </p>
-                        </div>
-                        <PointsBadge
-                          points={match.points}
-                          resultLabel={match.result_label}
-                          isDefault={match.is_default}
-                        />
-                      </div>
-                    </li>
+                    <MatchRow
+                      key={match.match_id}
+                      match={match}
+                      currentUserId={breakdown.user_id}
+                    />
                   ))}
                 </ul>
               )}

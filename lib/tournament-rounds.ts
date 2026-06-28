@@ -1,7 +1,7 @@
 import type { Match } from "@/lib/supabase/types";
 import { STAGE_LABELS } from "@/lib/teams";
 
-const KNOCKOUT_STAGE_ORDER = ["r16", "qf", "sf", "final"] as const;
+const KNOCKOUT_STAGE_ORDER = ["r32", "r16", "qf", "sf", "final"] as const;
 
 export type TournamentRoundKind = "group-md" | "knockout" | "props" | "live";
 

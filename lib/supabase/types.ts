@@ -17,7 +17,7 @@ export type Profile = {
 
 export type Match = {
   id: number;
-  stage: "group" | "r16" | "qf" | "sf" | "final";
+  stage: "group" | "r32" | "r16" | "qf" | "sf" | "final";
   home_team: string;
   away_team: string;
   kickoff_at: string;
