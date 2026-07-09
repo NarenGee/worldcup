@@ -347,23 +347,14 @@ export function PredictPageClient({
     toast.success("Props saved!");
   }
 
-  async function assignPowerUp(type: PowerUpType, matchId: number | null) {
+  async function assignPowerUp(type: PowerUpType, matchId: number) {
     const existing = powerUps.find((powerUp) => powerUp.power_up_type === type);
 
-    if (!matchId) {
-      if (!existing) return;
-
-      const { error } = await supabase
-        .from("user_power_ups")
-        .delete()
-        .eq("id", existing.id);
-
-      if (error) throw new Error(error.message);
-      setPowerUps((prev) => prev.filter((powerUp) => powerUp.id !== existing.id));
-      return;
-    }
-
     if (existing) {
+      if (type === "sneak_peek") {
+        throw new Error("Sneak peek is locked in and cannot be changed.");
+      }
+
       const { data, error } = await supabase
         .from("user_power_ups")
         .update({ match_id: matchId })

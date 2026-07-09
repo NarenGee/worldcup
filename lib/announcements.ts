@@ -30,7 +30,7 @@ export const QF_POWER_UPS_ANNOUNCEMENT: AnnouncementConfig = {
   label: "New feature",
   title: "Quarter-final power-ups",
   intro:
-    "Two new one-time picks unlock for the quarter-finals. Assign them on the Predict page before kickoff.",
+    "Two new picks unlock for the quarter-finals on the Predict page. Sneak peek locks in when confirmed; double points can be changed until kickoff.",
   features: [
     {
       label: POWER_UP_LABELS.double_points,

@@ -9,12 +9,12 @@ const POWER_UP_RULES = [
   {
     label: "Double points",
     points: "2×",
-    detail: "one quarter-final match",
+    detail: "one QF match · changeable until kickoff",
   },
   {
     label: "Sneak peek",
     points: "👀",
-    detail: "reveal rivals' saved picks on one QF match before kickoff",
+    detail: "one QF match · locks in when confirmed",
   },
 ] as const;
 
@@ -64,8 +64,8 @@ export function RulesSection() {
             <h3 className="instrument-heading text-sm">Quarter-final power-ups</h3>
             <p className="instrument-meta mt-1.5">
               Each player gets one double-points pick and one sneak peek for the
-              quarter-finals. Assign them on the Predict page — changeable until
-              that match kicks off.
+              quarter-finals. Sneak peek locks in when confirmed. Double points
+              can be changed until that match kicks off.
             </p>
             <ul className="mt-3 space-y-2">
               {POWER_UP_RULES.map((rule) => (
