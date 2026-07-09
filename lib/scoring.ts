@@ -29,7 +29,8 @@ export function awardMatchPoints(
   homeScore: number | null,
   awayScore: number | null,
   resultConfirmed: boolean,
-  isDefault: boolean
+  isDefault: boolean,
+  isDoubled = false
 ): number {
   const base = calculateMatchPoints(
     predictedHome,
@@ -38,7 +39,8 @@ export function awardMatchPoints(
     awayScore,
     resultConfirmed
   );
-  return isDefault ? base / 2 : base;
+  const awarded = isDefault ? base / 2 : base;
+  return isDoubled ? awarded * 2 : awarded;
 }
 
 export function formatAwardedPoints(points: number): string {

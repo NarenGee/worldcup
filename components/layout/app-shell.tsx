@@ -1,3 +1,4 @@
+import { FeatureAnnouncementDialog } from "@/components/announcements/feature-announcement-dialog";
 import { createClient } from "@/lib/supabase/server";
 import { MobileNav } from "./mobile-nav";
 import { NavBar } from "./nav-bar";
@@ -25,6 +26,12 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <MobileNav signedIn={!!user} />
+      {user && profile && (
+        <FeatureAnnouncementDialog
+          userId={user.id}
+          dismissedAnnouncements={profile.dismissed_announcements ?? []}
+        />
+      )}
     </div>
   );
 }

@@ -19,7 +19,7 @@ export default async function PredictPage() {
     // Migration may not be applied yet.
   }
 
-  const [{ data: matches }, { data: predictions }, { data: props }, { data: players }, { data: allPredictions }] =
+  const [{ data: matches }, { data: predictions }, { data: props }, { data: players }, { data: allPredictions }, { data: powerUps }] =
     await Promise.all([
       supabase.from("matches").select("*").order("kickoff_at"),
       supabase.from("predictions").select("*").eq("user_id", user.id),
@@ -32,6 +32,7 @@ export default async function PredictPage() {
       supabase
         .from("predictions")
         .select("user_id, match_id, predicted_home, predicted_away, is_default"),
+      supabase.from("user_power_ups").select("*").eq("user_id", user.id),
     ]);
 
   const groupMatches = (matches ?? []).filter((m) => m.stage === "group");
@@ -57,6 +58,7 @@ export default async function PredictPage() {
         tournamentStarted={tournamentStarted}
         players={players ?? []}
         predictionsByMatch={groupPredictionsByMatch(allPredictions ?? [])}
+        powerUps={powerUps ?? []}
       />
     </AppShell>
   );

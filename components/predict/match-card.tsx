@@ -26,6 +26,8 @@ type MatchCardProps = {
   onSave: () => void;
   saving?: boolean;
   playerPicks?: MatchPlayerPick[];
+  hasSneakPeek?: boolean;
+  isDoubled?: boolean;
 };
 
 export function MatchCard({
@@ -40,6 +42,8 @@ export function MatchCard({
   onSave,
   saving,
   playerPicks = [],
+  hasSneakPeek = false,
+  isDoubled = false,
 }: MatchCardProps) {
   const basePoints = match.result_confirmed
     ? calculateMatchPoints(
@@ -58,7 +62,8 @@ export function MatchCard({
           match.home_score,
           match.away_score,
           match.result_confirmed,
-          effectivePrediction.isDefault
+          effectivePrediction.isDefault,
+          isDoubled
         )
       : null;
 
@@ -71,7 +76,15 @@ export function MatchCard({
   return (
     <div className={`instrument-panel ${locked ? "opacity-60" : ""}`}>
       <div className="instrument-divider flex flex-wrap items-center justify-between gap-1 px-3 py-2.5 sm:gap-2 sm:px-4 sm:py-3">
-        <span className="instrument-label">{stageLabel}</span>
+        <span className="flex items-center gap-2">
+          <span className="instrument-label">{stageLabel}</span>
+          {isDoubled && (
+            <span className="instrument-label text-accent">· 2× Double</span>
+          )}
+          {hasSneakPeek && (
+            <span className="instrument-label text-wc-blue">· Sneak peek</span>
+          )}
+        </span>
         <span className="instrument-meta text-wc-blue">
           {format(new Date(match.kickoff_at), "yyyy.MM.dd · HH:mm")}
         </span>
@@ -126,6 +139,7 @@ export function MatchCard({
               {points !== null && (
                 <span className="ml-2 sm:ml-3">
                   +{formatAwardedPoints(points)} PTS
+                  {isDoubled ? " (2×)" : ""}
                 </span>
               )}
             </div>
@@ -176,6 +190,8 @@ export function MatchCard({
             kickoffAt={match.kickoff_at}
             picks={playerPicks}
             match={match}
+            hasSneakPeek={hasSneakPeek}
+            isDoubled={isDoubled}
             className="mt-5 sm:mt-6"
           />
         )}

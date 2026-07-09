@@ -6,7 +6,12 @@ import {
   groupPredictionsByMatch,
 } from "@/lib/match-predictions";
 import { getEffectivePrediction, isMatchLocked } from "@/lib/predictions";
+import {
+  hasDoublePointsOnMatch,
+  hasSneakPeekOnMatch,
+} from "@/lib/power-ups";
 import { awardMatchPoints, formatAwardedPoints } from "@/lib/scoring";
+import type { UserPowerUp } from "@/lib/supabase/types";
 import { formatTeam, STAGE_LABELS } from "@/lib/teams";
 import { createClient } from "@/lib/supabase/server";
 import { format } from "date-fns";
@@ -30,16 +35,20 @@ export default async function MatchesPage() {
     .select("*")
     .order("kickoff_at");
 
-  const [{ data: players }, { data: allPredictions }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, display_name, avatar_url")
-      .eq("is_active", true)
-      .order("display_name"),
-    supabase
-      .from("predictions")
-      .select("user_id, match_id, predicted_home, predicted_away, is_default"),
-  ]);
+  const [{ data: players }, { data: allPredictions }, { data: powerUps }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, display_name, avatar_url")
+        .eq("is_active", true)
+        .order("display_name"),
+      supabase
+        .from("predictions")
+        .select("user_id, match_id, predicted_home, predicted_away, is_default"),
+      user
+        ? supabase.from("user_power_ups").select("*").eq("user_id", user.id)
+        : Promise.resolve({ data: [] as UserPowerUp[] }),
+    ]);
 
   const predictionsByMatch = groupPredictionsByMatch(allPredictions ?? []);
 
@@ -67,6 +76,7 @@ export default async function MatchesPage() {
   }
 
   const matchList = matches ?? [];
+  const userPowerUps = powerUps ?? [];
 
   return (
     <AppShell>
@@ -100,7 +110,8 @@ export default async function MatchesPage() {
                     match.home_score,
                     match.away_score,
                     match.result_confirmed,
-                    pred.isDefault
+                    pred.isDefault,
+                    hasDoublePointsOnMatch(userPowerUps, match.id)
                   )
                 : null;
 
@@ -162,6 +173,7 @@ export default async function MatchesPage() {
                     {points !== null && (
                       <span className="ml-2 text-accent">
                         +{formatAwardedPoints(points)} PTS
+                        {hasDoublePointsOnMatch(userPowerUps, match.id) ? " (2×)" : ""}
                       </span>
                     )}
                   </p>
@@ -171,6 +183,8 @@ export default async function MatchesPage() {
                     kickoffAt={match.kickoff_at}
                     picks={playerPicks}
                     match={match}
+                    hasSneakPeek={hasSneakPeekOnMatch(userPowerUps, match.id)}
+                    isDoubled={hasDoublePointsOnMatch(userPowerUps, match.id)}
                     className="mt-3"
                   />
                 )}

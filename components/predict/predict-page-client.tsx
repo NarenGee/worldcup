@@ -11,17 +11,23 @@ import {
   type PlayerProfile,
 } from "@/lib/match-predictions";
 import { getEffectivePrediction, isMatchLocked } from "@/lib/predictions";
+import {
+  hasDoublePointsOnMatch,
+  hasSneakPeekOnMatch,
+  type PowerUpType,
+} from "@/lib/power-ups";
 import { calculateMatchPoints } from "@/lib/scoring";
 import { getPlayerPickerOptions } from "@/lib/players";
 import { getTeamQuote } from "@/lib/team-quotes";
 import { getUniqueTeamsFromMatches, formatTeam } from "@/lib/teams";
-import type { Match, Prediction, Props } from "@/lib/supabase/types";
+import type { Match, Prediction, Props, UserPowerUp } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { KickoffCountdown } from "./kickoff-countdown";
 import { MatchCard } from "./match-card";
+import { PowerUpsPanel } from "./power-ups-panel";
 import { SearchablePicker } from "./searchable-picker";
 import { TeamQuote } from "./team-quote";
 
@@ -33,6 +39,7 @@ type PredictPageClientProps = {
   tournamentStarted: boolean;
   players: PlayerProfile[];
   predictionsByMatch: ReturnType<typeof groupPredictionsByMatch>;
+  powerUps: UserPowerUp[];
 };
 
 export function PredictPageClient({
@@ -43,12 +50,14 @@ export function PredictPageClient({
   tournamentStarted,
   players,
   predictionsByMatch: initialPredictionsByMatch,
+  powerUps: initialPowerUps,
 }: PredictPageClientProps) {
   const [predictions, setPredictions] = useState(initialPredictions);
   const [predictionsByMatch, setPredictionsByMatch] = useState(
     initialPredictionsByMatch
   );
   const [userProps, setUserProps] = useState(initialProps);
+  const [powerUps, setPowerUps] = useState(initialPowerUps);
   const [scores, setScores] = useState<Record<number, { home: number; away: number }>>(() => {
     const map: Record<number, { home: number; away: number }> = {};
     for (const p of initialPredictions) {
@@ -91,6 +100,17 @@ export function PredictPageClient({
 
   const pastMatches = useMemo(
     () => matchesState.filter((m) => isMatchLocked(m.kickoff_at)),
+    [matchesState]
+  );
+
+  const qfMatches = useMemo(
+    () =>
+      matchesState
+        .filter((match) => match.stage === "qf")
+        .sort(
+          (a, b) =>
+            new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime()
+        ),
     [matchesState]
   );
 
@@ -327,6 +347,51 @@ export function PredictPageClient({
     toast.success("Props saved!");
   }
 
+  async function assignPowerUp(type: PowerUpType, matchId: number | null) {
+    const existing = powerUps.find((powerUp) => powerUp.power_up_type === type);
+
+    if (!matchId) {
+      if (!existing) return;
+
+      const { error } = await supabase
+        .from("user_power_ups")
+        .delete()
+        .eq("id", existing.id);
+
+      if (error) throw new Error(error.message);
+      setPowerUps((prev) => prev.filter((powerUp) => powerUp.id !== existing.id));
+      return;
+    }
+
+    if (existing) {
+      const { data, error } = await supabase
+        .from("user_power_ups")
+        .update({ match_id: matchId })
+        .eq("id", existing.id)
+        .select()
+        .single();
+
+      if (error) throw new Error(error.message);
+      setPowerUps((prev) =>
+        prev.map((powerUp) => (powerUp.id === existing.id ? data : powerUp))
+      );
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_power_ups")
+      .insert({
+        user_id: userId,
+        power_up_type: type,
+        match_id: matchId,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    setPowerUps((prev) => [...prev, data]);
+  }
+
   function renderMatchGroups(
     grouped: [string, Match[]][],
     emptyMessage: string
@@ -373,6 +438,8 @@ export function PredictPageClient({
               playerPicks={playerPicks}
               homeScore={score.home}
               awayScore={score.away}
+              hasSneakPeek={hasSneakPeekOnMatch(powerUps, match.id)}
+              isDoubled={hasDoublePointsOnMatch(powerUps, match.id)}
               onHomeChange={(v) =>
                 setScores((prev) => ({
                   ...prev,
@@ -405,6 +472,12 @@ export function PredictPageClient({
       </header>
 
       <KickoffCountdown kickoffAt={nextKickoff} />
+
+      <PowerUpsPanel
+        qfMatches={qfMatches}
+        powerUps={powerUps}
+        onAssign={assignPowerUp}
+      />
 
       {matchesState.length === 0 ? (
         <p className="instrument-meta py-12 text-center">

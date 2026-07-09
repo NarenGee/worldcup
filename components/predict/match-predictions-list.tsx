@@ -18,6 +18,8 @@ type MatchPredictionsListProps = {
     Match,
     "result_confirmed" | "home_score" | "away_score"
   >;
+  hasSneakPeek?: boolean;
+  isDoubled?: boolean;
   className?: string;
 };
 
@@ -36,6 +38,8 @@ export function MatchPredictionsList({
   kickoffAt,
   picks,
   match,
+  hasSneakPeek = false,
+  isDoubled = false,
   className,
 }: MatchPredictionsListProps) {
   const [now, setNow] = useState(() => new Date());
@@ -48,17 +52,25 @@ export function MatchPredictionsList({
 
   if (picks.length === 0) return null;
 
+  const headerLabel = locked
+    ? "All picks"
+    : hasSneakPeek
+      ? "Player picks · Sneak peek active"
+      : "Player picks · Hidden until kickoff";
+
   return (
     <div className={cn("border-t border-border/60 pt-3", className)}>
-      <p className="instrument-label mb-2">
-        {locked ? "All picks" : "Player picks · Hidden until kickoff"}
-      </p>
+      <p className="instrument-label mb-2">{headerLabel}</p>
       <ul className="space-y-2">
         {picks.map((pick) => {
           const showScore =
-            locked || (pick.isCurrentUser && pick.hasSubmitted);
+            locked ||
+            (pick.isCurrentUser && pick.hasSubmitted) ||
+            (hasSneakPeek && pick.hasSubmitted && !pick.isCurrentUser);
           const showNotSaved =
             pick.isCurrentUser && !locked && !pick.hasSubmitted;
+          const showHiddenRival =
+            !locked && hasSneakPeek && !pick.isCurrentUser && !pick.hasSubmitted;
           const points =
             showScore &&
             locked &&
@@ -71,7 +83,8 @@ export function MatchPredictionsList({
                   match.home_score,
                   match.away_score,
                   match.result_confirmed,
-                  pick.isDefault
+                  pick.isDefault,
+                  pick.isCurrentUser && isDoubled
                 )
               : null;
 
@@ -104,6 +117,8 @@ export function MatchPredictionsList({
               <div className="flex shrink-0 items-center gap-2">
                 {showNotSaved ? (
                   <span className="instrument-meta normal-case">Not saved</span>
+                ) : showHiddenRival ? (
+                  <span className="instrument-meta normal-case">Not saved</span>
                 ) : showScore ? (
                   <>
                     <span className="font-display text-sm font-black tabular-nums">
@@ -118,6 +133,7 @@ export function MatchPredictionsList({
                     {points !== null && (
                       <span className="instrument-meta text-accent">
                         +{formatAwardedPoints(points)}
+                        {pick.isCurrentUser && isDoubled ? " (2×)" : ""}
                       </span>
                     )}
                   </>

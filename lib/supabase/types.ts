@@ -12,6 +12,7 @@ export type Profile = {
   avatar_url: string | null;
   is_admin: boolean;
   is_active: boolean;
+  dismissed_announcements: string[];
   created_at: string;
 };
 
@@ -45,6 +46,14 @@ export type Props = {
   champion: string | null;
   top_scorer: string | null;
   submitted_at: string;
+};
+
+export type UserPowerUp = {
+  id: number;
+  user_id: string;
+  power_up_type: "double_points" | "sneak_peek";
+  match_id: number;
+  assigned_at: string;
 };
 
 export type TournamentResults = {
@@ -84,6 +93,7 @@ export type Database = {
           avatar_url?: string | null;
           is_admin?: boolean;
           is_active?: boolean;
+          dismissed_announcements?: string[];
           created_at?: string;
         };
         Update: {
@@ -91,6 +101,7 @@ export type Database = {
           avatar_url?: string | null;
           is_admin?: boolean;
           is_active?: boolean;
+          dismissed_announcements?: string[];
         };
         Relationships: [];
       };
@@ -152,6 +163,20 @@ export type Database = {
         Update: {
           champion?: string | null;
           top_scorer?: string | null;
+        };
+        Relationships: [];
+      };
+      user_power_ups: {
+        Row: UserPowerUp;
+        Insert: {
+          id?: number;
+          user_id: string;
+          power_up_type: UserPowerUp["power_up_type"];
+          match_id: number;
+          assigned_at?: string;
+        };
+        Update: {
+          match_id?: number;
         };
         Relationships: [];
       };

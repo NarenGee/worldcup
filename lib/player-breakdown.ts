@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { hasDoublePointsOnMatch } from "@/lib/power-ups";
 import { awardMatchPoints, baseResultLabel, calculatePropsPoints } from "@/lib/scoring";
 import type { Database } from "@/lib/supabase/types";
 
@@ -72,6 +73,7 @@ export async function getPlayerPointsBreakdown(
     { data: confirmedMatches },
     { data: props },
     { data: tournamentResults },
+    { data: powerUps },
   ] = await Promise.all([
     supabase
       .from("predictions")
@@ -86,6 +88,7 @@ export async function getPlayerPointsBreakdown(
       .lte("kickoff_at", now),
     supabase.from("props").select("champion, top_scorer").eq("user_id", userId).maybeSingle(),
     supabase.from("tournament_results").select("champion, top_scorer").eq("id", 1).single(),
+    supabase.from("user_power_ups").select("*").eq("user_id", userId),
   ]);
 
   const matchById = new Map((confirmedMatches ?? []).map((match) => [match.id, match]));
@@ -106,7 +109,8 @@ export async function getPlayerPointsBreakdown(
         match.home_score,
         match.away_score,
         match.result_confirmed,
-        isDefault
+        isDefault,
+        hasDoublePointsOnMatch(powerUps ?? [], match.id)
       );
 
     matches.push({

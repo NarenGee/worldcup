@@ -5,6 +5,19 @@ const MATCH_RULES = [
   { label: "Auto pick (missed)", points: "½", detail: "half of match points" },
 ] as const;
 
+const POWER_UP_RULES = [
+  {
+    label: "Double points",
+    points: "2×",
+    detail: "one quarter-final match",
+  },
+  {
+    label: "Sneak peek",
+    points: "👀",
+    detail: "reveal rivals' saved picks on one QF match before kickoff",
+  },
+] as const;
+
 const PROP_RULES = [
   { label: "Champion", points: 5 },
   { label: "Top scorer", points: 3 },
@@ -47,6 +60,32 @@ export function RulesSection() {
               </li>
             ))}
           </ul>
+          <div className="border-t border-border pt-4">
+            <h3 className="instrument-heading text-sm">Quarter-final power-ups</h3>
+            <p className="instrument-meta mt-1.5">
+              Each player gets one double-points pick and one sneak peek for the
+              quarter-finals. Assign them on the Predict page — changeable until
+              that match kicks off.
+            </p>
+            <ul className="mt-3 space-y-2">
+              {POWER_UP_RULES.map((rule) => (
+                <li
+                  key={rule.label}
+                  className="flex items-baseline justify-between gap-3"
+                >
+                  <span className="text-sm text-foreground">
+                    {rule.label}
+                    <span className="instrument-meta ml-1 normal-case">
+                      ({rule.detail})
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-display text-sm font-black tabular-nums text-primary">
+                    {rule.points}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         <div className="space-y-4 px-3 py-4 sm:px-4">
